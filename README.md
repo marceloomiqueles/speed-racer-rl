@@ -150,9 +150,16 @@ To train with live visualization (slower):
 ./racing_trainer --track sandbox --render
 ```
 
+To reset a track training run (checkpoints + scheduler state) and restart from episode 1:
+
+```bash
+./racing_trainer --track sandbox --reset-training
+```
+
 Training runs headless and periodically saves model checkpoints.
 Checkpoints are stored per track in `build/models/<track_name>/` (for example `build/models/sandbox/best_time.pt`).
 Best-time checkpoints are also exported outside `build` to `trainedModels/<track_name>/best_time.pt`.
+Training scheduler state (`episode_next`, `epsilon`, learning-rate schedule) is saved in `build/models/<track_name>/training_state.txt`.
 
 Exact behavior (episode length, epsilon schedule, learning rate, etc.) is defined in code and can be adjusted in `racing_trainer.cpp`.
 

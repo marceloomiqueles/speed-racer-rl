@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
 
 // Ctrl+C support.
 volatile sig_atomic_t interrupted = 0;
@@ -409,6 +410,7 @@ int main(int argc, char* argv[]) {
     int MILESTONE_FREQUENCY = 50;
     std::string trackName = "sandbox";
     bool ENABLE_RENDER = false;
+    bool RESET_TRAINING = false;
     const int BATCH_SIZE = 32;
     const int REPLAY_BUFFER_SIZE = 50000;
 
@@ -433,6 +435,8 @@ int main(int argc, char* argv[]) {
             trackName = argv[++i];
         } else if (arg == "--render") {
             ENABLE_RENDER = true;
+        } else if (arg == "--reset-training") {
+            RESET_TRAINING = true;
         } else if (arg == "--milestone") {
             if (i + 1 >= argc) {
                 std::cerr << "Missing value for --milestone\n";
@@ -440,8 +444,8 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--render]\n";
-            std::cout << "Example: racing_trainer --milestone 50 --track sandbox --render\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--render] [--reset-training]\n";
+            std::cout << "Example: racing_trainer --milestone 50 --track sandbox --render --reset-training\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -471,6 +475,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "Batch size: " << BATCH_SIZE << "\n";
     std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
+    std::cout << "Reset training: " << (RESET_TRAINING ? "yes" : "no") << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
 
@@ -502,11 +507,33 @@ int main(int argc, char* argv[]) {
     fs::path modelsRoot = "models";
     fs::path trackModelDir = modelsRoot / track.name;
     fs::path trackBestTimePath = trackModelDir / "best_time.pt";
+    fs::path trackStatePath = trackModelDir / "training_state.txt";
     fs::path externalModelsRoot = fs::path("..") / "trainedModels";
     fs::path externalTrackModelDir = externalModelsRoot / track.name;
     fs::path externalBestTimePath = externalTrackModelDir / "best_time.pt";
 
     std::error_code ec;
+    if (RESET_TRAINING) {
+        fs::remove_all(trackModelDir, ec);
+        if (ec) {
+            std::cerr << "Failed to reset local track model directory: " << trackModelDir.string()
+                      << " (" << ec.message() << ")\n";
+            UnloadImage(trackImage);
+            return 1;
+        }
+
+        ec.clear();
+        fs::remove_all(externalTrackModelDir, ec);
+        if (ec) {
+            std::cerr << "Failed to reset external track model directory: " << externalTrackModelDir.string()
+                      << " (" << ec.message() << ")\n";
+            UnloadImage(trackImage);
+            return 1;
+        }
+        std::cout << "Training reset complete for track '" << track.name << "'.\n";
+    }
+
+    ec.clear();
     fs::create_directories(trackModelDir, ec);
     if (ec) {
         std::cerr << "Failed to create model directory: " << trackModelDir.string()
@@ -556,9 +583,10 @@ int main(int argc, char* argv[]) {
 		
 float epsilon = EPSILON_START;
     TrainingStats stats;
-	
+		
     auto training_start = std::chrono::steady_clock::now();
 
+    int startEpisode = 1;
     double best_finish_rate = -1.0;
     double best_time_avg_steps_finish = 1e18;
     double best_score = -1e18;
@@ -570,7 +598,48 @@ float epsilon = EPSILON_START;
     bool lr_dropped_once = false;
     bool lr_dropped_twice = false;
 
-    for (int episode = 1; !interrupted; episode++) {
+    if (resumedFromCheckpoint && fs::is_regular_file(trackStatePath)) {
+        std::ifstream stateFile(trackStatePath);
+        std::unordered_map<std::string, std::string> state;
+        std::string line;
+        while (std::getline(stateFile, line)) {
+            auto pos = line.find('=');
+            if (pos == std::string::npos) continue;
+            state[line.substr(0, pos)] = line.substr(pos + 1);
+        }
+        try {
+            if (state.count("episode_next")) startEpisode = std::max(1, std::stoi(state["episode_next"]));
+            if (state.count("epsilon")) epsilon = std::stof(state["epsilon"]);
+            if (state.count("best_finish_rate")) best_finish_rate = std::stod(state["best_finish_rate"]);
+            if (state.count("best_time_avg_steps_finish")) best_time_avg_steps_finish = std::stod(state["best_time_avg_steps_finish"]);
+            if (state.count("best_score")) best_score = std::stod(state["best_score"]);
+            if (state.count("lr_dropped_once")) lr_dropped_once = (state["lr_dropped_once"] == "1");
+            if (state.count("lr_dropped_twice")) lr_dropped_twice = (state["lr_dropped_twice"] == "1");
+            if (state.count("learning_rate")) dqn.set_learning_rate(std::stof(state["learning_rate"]));
+            std::cout << "Resumed training state from: " << trackStatePath.string()
+                      << " (next episode: " << startEpisode << ", epsilon: " << epsilon << ")\n";
+        } catch (...) {
+            std::cout << "Warning: invalid training state file, continuing with default scheduler state.\n";
+        }
+    }
+
+    auto save_training_state = [&](int nextEpisode) {
+        std::ofstream stateFile(trackStatePath);
+        if (!stateFile.is_open()) {
+            std::cerr << "Warning: failed to write training state file: " << trackStatePath.string() << "\n";
+            return;
+        }
+        stateFile << "episode_next=" << nextEpisode << "\n";
+        stateFile << "epsilon=" << epsilon << "\n";
+        stateFile << "best_finish_rate=" << best_finish_rate << "\n";
+        stateFile << "best_time_avg_steps_finish=" << best_time_avg_steps_finish << "\n";
+        stateFile << "best_score=" << best_score << "\n";
+        stateFile << "lr_dropped_once=" << (lr_dropped_once ? 1 : 0) << "\n";
+        stateFile << "lr_dropped_twice=" << (lr_dropped_twice ? 1 : 0) << "\n";
+        stateFile << "learning_rate=" << dqn.get_learning_rate() << "\n";
+    };
+
+    for (int episode = startEpisode; !interrupted; episode++) {
         std::vector<Checkpoint> checkpoints = checkpointsTemplate;
         for (auto& cp : checkpoints) cp.crossed = false;
 
@@ -1018,6 +1087,7 @@ float epsilon = EPSILON_START;
             }
 
             std::cout << "\n";
+            save_training_state(episode + 1);
         }
     }
 
@@ -1025,6 +1095,7 @@ float epsilon = EPSILON_START;
         std::cout << "\n\nInterrupted! Saving final model...\n";
         std::string final_path = (trackModelDir / "model_final.pt").string();
         dqn.save_model(final_path);
+        save_training_state(startEpisode + (int)stats.episode_rewards.size());
         std::cout << "Final model saved. Safe to exit.\n";
     }
 
