@@ -275,6 +275,11 @@ static inline float DistToCheckpointMid(const std::vector<Checkpoint>& checkpoin
     return sqrtf(dx*dx + dy*dy);
 }
 
+static inline Vector2 CheckpointMid(const std::vector<Checkpoint>& checkpoints, int cpIndex) {
+    const Checkpoint& cp = checkpoints[cpIndex];
+    return {(cp.start.x + cp.end.x) * 0.5f, (cp.start.y + cp.end.y) * 0.5f};
+}
+
 struct EvalResult {
     int episodes = 0;
 
@@ -1009,6 +1014,11 @@ float epsilon = EPSILON_START;
         const float STUCK_DIST_THRESHOLD = 30.0f;
         const int STUCK_STRIKES_MAX = 3;
         const float STUCK_BREAK_PENALTY = 50.0f;
+        const float WRONG_WAY_PENALTY = 0.08f;
+        const float WRONG_WAY_SPEED_MIN = 20.0f;
+        const float WRONG_WAY_DOT_THRESHOLD = -0.20f;
+        const int WRONG_WAY_GRACE_FRAMES = 8;
+        int wrongWayCounter = 0;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
             ? get_stage_params(curriculumStage)
             : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
@@ -1152,6 +1162,37 @@ float epsilon = EPSILON_START;
 
             if (progress > 0.0f){
                 reward += fabs(speed) * DT * stageParams.speed_progress_gain;
+            }
+
+            // Penalize driving against local track direction (wrong-way).
+            // Local track direction is approximated by vector from next checkpoint midpoint
+            // to the following checkpoint midpoint.
+            const int cpA = nextCheckpoint;
+            const int cpB = (nextCheckpoint + 1) % (int)checkpoints.size();
+            Vector2 mA = CheckpointMid(checkpoints, cpA);
+            Vector2 mB = CheckpointMid(checkpoints, cpB);
+            Vector2 trackDir = {mB.x - mA.x, mB.y - mA.y};
+            float trackDirLen = sqrtf(trackDir.x * trackDir.x + trackDir.y * trackDir.y);
+            float speedAbs = fabs(speed);
+            if (trackDirLen > 1e-3f && speedAbs > WRONG_WAY_SPEED_MIN) {
+                trackDir.x /= trackDirLen;
+                trackDir.y /= trackDirLen;
+                Vector2 carDir = {cosf(angle), sinf(angle)};
+                if (speed < 0.0f) {
+                    carDir.x = -carDir.x;
+                    carDir.y = -carDir.y;
+                }
+                float dirDot = carDir.x * trackDir.x + carDir.y * trackDir.y;
+                if (dirDot < WRONG_WAY_DOT_THRESHOLD) {
+                    wrongWayCounter++;
+                } else {
+                    wrongWayCounter = 0;
+                }
+                if (wrongWayCounter > WRONG_WAY_GRACE_FRAMES) {
+                    reward -= WRONG_WAY_PENALTY * speedAbs * DT;
+                }
+            } else {
+                wrongWayCounter = 0;
             }
 
             if (hitWall) reward -= stageParams.wall_hit_penalty;
