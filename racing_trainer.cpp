@@ -498,6 +498,9 @@ int main(int argc, char* argv[]) {
     fs::path modelsRoot = "models";
     fs::path trackModelDir = modelsRoot / track.name;
     fs::path trackBestTimePath = trackModelDir / "best_time.pt";
+    fs::path externalModelsRoot = fs::path("..") / "trainedModels";
+    fs::path externalTrackModelDir = externalModelsRoot / track.name;
+    fs::path externalBestTimePath = externalTrackModelDir / "best_time.pt";
 
     std::error_code ec;
     fs::create_directories(trackModelDir, ec);
@@ -508,6 +511,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    ec.clear();
+    fs::create_directories(externalTrackModelDir, ec);
+    if (ec) {
+        std::cerr << "Warning: failed to create external model directory: "
+                  << externalTrackModelDir.string() << " (" << ec.message() << ")\n";
+    }
+
     bool resumedFromCheckpoint = false;
     try {
         if (fs::is_regular_file(trackBestTimePath)) {
@@ -515,6 +525,11 @@ int main(int argc, char* argv[]) {
             dqn.set_learning_rate(1e-4f);
             resumedFromCheckpoint = true;
             std::cout << "Resumed from: " << trackBestTimePath.string() << "\n";
+        } else if (fs::is_regular_file(externalBestTimePath)) {
+            dqn.load_model(externalBestTimePath.string());
+            dqn.set_learning_rate(1e-4f);
+            resumedFromCheckpoint = true;
+            std::cout << "Resumed from external checkpoint: " << externalBestTimePath.string() << "\n";
         }
     } catch (const std::exception& e) {
         std::cerr << "Failed to load checkpoint: " << e.what() << "\n";
@@ -916,6 +931,12 @@ float epsilon = EPSILON_START;
                 dqn.save_model(best_time_path);
                 std::cout << "★ Updated " << best_time_path << " (avg_steps_finish="
                             << std::fixed << std::setprecision(1) << best_time_avg_steps_finish << ")\n";
+
+                if (fs::is_directory(externalTrackModelDir)) {
+                    std::string external_best_time_path = externalBestTimePath.string();
+                    dqn.save_model(external_best_time_path);
+                    std::cout << "★ Exported " << external_best_time_path << "\n";
+                }
             }
 
             bool save_score = false;

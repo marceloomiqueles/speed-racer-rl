@@ -128,7 +128,7 @@ To visualize a file from `sampleModels/`:
 ./racing_replay sampleModels/best_time.pt --track sandbox
 ```
 
-Or use auto mode (loads `models/<track>/best_time.pt`):
+Or use auto mode (loads `models/<track>/best_time.pt` and falls back to `../trainedModels/<track>/best_time.pt`):
 
 ```bash
 ./racing_replay --track sandbox
@@ -146,6 +146,7 @@ To train a new agent:
 
 Training runs headless and periodically saves model checkpoints.
 Checkpoints are stored per track in `build/models/<track_name>/` (for example `build/models/sandbox/best_time.pt`).
+Best-time checkpoints are also exported outside `build` to `trainedModels/<track_name>/best_time.pt`.
 
 Exact behavior (episode length, epsilon schedule, learning rate, etc.) is defined in code and can be adjusted in `racing_trainer.cpp`.
 

@@ -208,7 +208,13 @@ int main(int argc, char* argv[]) {
 
     namespace fs = std::filesystem;
     if (modelPath.empty()) {
-        modelPath = (fs::path("models") / track.name / "best_time.pt").string();
+        fs::path localBest = fs::path("models") / track.name / "best_time.pt";
+        fs::path externalBest = fs::path("..") / "trainedModels" / track.name / "best_time.pt";
+        if (fs::is_regular_file(localBest)) {
+            modelPath = localBest.string();
+        } else {
+            modelPath = externalBest.string();
+        }
         std::cout << "Auto model path: " << modelPath << "\n";
     }
 
