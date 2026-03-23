@@ -306,14 +306,15 @@ int main(int argc, char* argv[]) {
     float speed = 0.0f;
 
 // Race state
-    int currentLap = -1;
+    const bool START_LAP_ACTIVE = (track.name != "sandbox");
+    int currentLap = START_LAP_ACTIVE ? 1 : -1;
     int totalLaps = 3;
     float currentLapTime = 0.0f;
     float bestLapTime = 999999.0f;
     std::vector<float> lapTimes;
     bool raceStarted = true;
     bool raceFinished = false;
-    int nextCheckpoint = 0;
+    int nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
 
     bool showLidar = true;
 
@@ -330,11 +331,11 @@ int main(int argc, char* argv[]) {
             velocity = {0, 0};
             speed = 0;
             angle = track.spawn_angle;
-            currentLap = 0;
+            currentLap = START_LAP_ACTIVE ? 1 : 0;
             currentLapTime = 0;
             raceStarted = true;
             raceFinished = false;
-            nextCheckpoint = 0;
+            nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
             lapTimes.clear();
             bestLapTime = 999999.0f;
             for (auto& checkpoint : checkpoints) checkpoint.crossed = false;

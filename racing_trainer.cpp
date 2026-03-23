@@ -201,6 +201,7 @@ static EvalResult EvaluateGreedy(
     const std::vector<Checkpoint>& checkpointsTemplate,
     const Vector2& spawnPosition,
     float spawnAngle,
+    bool startLapActive,
     int evalEpisodes,
     int max_steps,
     float DT
@@ -243,9 +244,9 @@ static EvalResult EvaluateGreedy(
         float angle = spawnAngle;
         float speed = 0.0f;
 
-        int currentLap = -1;
+        int currentLap = startLapActive ? 1 : -1;
         const int totalLaps = 3;
-        int nextCheckpoint = 0;
+        int nextCheckpoint = startLapActive ? 1 : 0;
         bool raceFinished = false;
 
         int wallHits = 0;
@@ -511,6 +512,8 @@ int main(int argc, char* argv[]) {
     fs::path externalModelsRoot = fs::path("..") / "trainedModels";
     fs::path externalTrackModelDir = externalModelsRoot / track.name;
     fs::path externalBestTimePath = externalTrackModelDir / "best_time.pt";
+    fs::path trackFinalPath = trackModelDir / "model_final.pt";
+    fs::path resumeModelPath;
 
     std::error_code ec;
     if (RESET_TRAINING) {
@@ -549,18 +552,53 @@ int main(int argc, char* argv[]) {
                   << externalTrackModelDir.string() << " (" << ec.message() << ")\n";
     }
 
+    auto find_latest_episode_model = [&](const fs::path& dir) -> fs::path {
+        if (!fs::is_directory(dir)) return {};
+        int bestEpisode = -1;
+        fs::path bestPath;
+        for (const auto& entry : fs::directory_iterator(dir)) {
+            if (!entry.is_regular_file()) continue;
+            fs::path p = entry.path();
+            if (p.extension() != ".pt") continue;
+            std::string name = p.filename().string();
+            const std::string prefix = "model_episode_";
+            const std::string suffix = ".pt";
+            if (name.rfind(prefix, 0) != 0) continue;
+            if (name.size() <= prefix.size() + suffix.size()) continue;
+            if (name.substr(name.size() - suffix.size()) != suffix) continue;
+            std::string n = name.substr(prefix.size(), name.size() - prefix.size() - suffix.size());
+            try {
+                int ep = std::stoi(n);
+                if (ep > bestEpisode) {
+                    bestEpisode = ep;
+                    bestPath = p;
+                }
+            } catch (...) {
+            }
+        }
+        return bestPath;
+    };
+
+    if (fs::is_regular_file(trackBestTimePath)) {
+        resumeModelPath = trackBestTimePath;
+    } else if (fs::is_regular_file(trackFinalPath)) {
+        resumeModelPath = trackFinalPath;
+    } else {
+        fs::path latest = find_latest_episode_model(trackModelDir);
+        if (!latest.empty()) {
+            resumeModelPath = latest;
+        } else if (fs::is_regular_file(externalBestTimePath)) {
+            resumeModelPath = externalBestTimePath;
+        }
+    }
+
     bool resumedFromCheckpoint = false;
     try {
-        if (fs::is_regular_file(trackBestTimePath)) {
-            dqn.load_model(trackBestTimePath.string());
+        if (!resumeModelPath.empty()) {
+            dqn.load_model(resumeModelPath.string());
             dqn.set_learning_rate(1e-4f);
             resumedFromCheckpoint = true;
-            std::cout << "Resumed from: " << trackBestTimePath.string() << "\n";
-        } else if (fs::is_regular_file(externalBestTimePath)) {
-            dqn.load_model(externalBestTimePath.string());
-            dqn.set_learning_rate(1e-4f);
-            resumedFromCheckpoint = true;
-            std::cout << "Resumed from external checkpoint: " << externalBestTimePath.string() << "\n";
+            std::cout << "Resumed from: " << resumeModelPath.string() << "\n";
         }
     } catch (const std::exception& e) {
         std::cerr << "Failed to load checkpoint: " << e.what() << "\n";
@@ -598,7 +636,7 @@ float epsilon = EPSILON_START;
     bool lr_dropped_once = false;
     bool lr_dropped_twice = false;
 
-    if (resumedFromCheckpoint && fs::is_regular_file(trackStatePath)) {
+    if (fs::is_regular_file(trackStatePath)) {
         std::ifstream stateFile(trackStatePath);
         std::unordered_map<std::string, std::string> state;
         std::string line;
@@ -621,6 +659,8 @@ float epsilon = EPSILON_START;
         } catch (...) {
             std::cout << "Warning: invalid training state file, continuing with default scheduler state.\n";
         }
+    } else if (resumedFromCheckpoint) {
+        std::cout << "Checkpoint loaded, but no training_state.txt found. Continuing with default scheduler state.\n";
     }
 
     auto save_training_state = [&](int nextEpisode) {
@@ -648,9 +688,10 @@ float epsilon = EPSILON_START;
         float angle = track.spawn_angle;
         float speed = 0.0f;
 
-        int currentLap = -1;
+        const bool START_LAP_ACTIVE = (track.name != "sandbox");
+        int currentLap = START_LAP_ACTIVE ? 1 : -1;
         const int totalLaps = 3;
-        int nextCheckpoint = 0;
+        int nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
         bool raceFinished = false;
 
         float episode_reward = 0.0f;
@@ -1009,6 +1050,7 @@ float epsilon = EPSILON_START;
                 checkpointsTemplate,
                 track.spawn_position,
                 track.spawn_angle,
+                (track.name != "sandbox"),
                 EVAL_EPISODES,
                 EVAL_MAX_STEPS,
                 DT
