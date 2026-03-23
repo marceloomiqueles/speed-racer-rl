@@ -436,6 +436,7 @@ static EvalResult EvaluateGreedy(
         const int totalLaps = 3;
         int nextCheckpoint = startLapActive ? 1 : 0;
         bool raceFinished = false;
+        int consecutiveWallHits = 0;
 
         int wallHits = 0;
         int grassFrames = 0;
@@ -511,18 +512,46 @@ static EvalResult EvaluateGreedy(
             int pixelX = (int)position.x;
             int pixelY = (int)position.y;
 
+            bool hitWall = false;
             if (pixelX >= 0 && pixelX < trackImage.width &&
                 pixelY >= 0 && pixelY < trackImage.height) {
                 Color currentColor = GetImageColor(trackImage, pixelX, pixelY);
                 if (IsWall(currentColor)) {
+                    hitWall = true;
                     wallHits++;
                     position = prevPosition;
-                    speed *= -0.3f;
+                    speed = 0.0f;
                 }
             } else {
+                hitWall = true;
                 wallHits++;
                 position = prevPosition;
-                speed *= -0.3f;
+                speed = 0.0f;
+            }
+
+            if (hitWall) {
+                consecutiveWallHits++;
+            } else {
+                consecutiveWallHits = 0;
+            }
+
+            if (consecutiveWallHits >= 3) {
+                Checkpoint& cpTarget = checkpoints[nextCheckpoint];
+                Vector2 cpMid = {
+                    (cpTarget.start.x + cpTarget.end.x) * 0.5f,
+                    (cpTarget.start.y + cpTarget.end.y) * 0.5f
+                };
+                Vector2 toCp = {cpMid.x - position.x, cpMid.y - position.y};
+                float toCpLen = sqrtf(toCp.x * toCp.x + toCp.y * toCp.y);
+                if (toCpLen > 1e-3f) {
+                    toCp.x /= toCpLen;
+                    toCp.y /= toCpLen;
+                    angle = atan2f(toCp.y, toCp.x);
+                    position.x += toCp.x * 3.0f;
+                    position.y += toCp.y * 3.0f;
+                    speed = 20.0f;
+                }
+                consecutiveWallHits = 0;
             }
 
             Checkpoint& cp = checkpoints[nextCheckpoint];
@@ -985,14 +1014,14 @@ int main(int argc, char* argv[]) {
     } else if (!initModelPathArg.empty()) {
         resumeModelPath = initModelPathArg;
         useFreshScheduler = true;
-    } else if (fs::is_regular_file(trackBestTimePath)) {
-        resumeModelPath = trackBestTimePath;
-    } else if (fs::is_regular_file(trackFinalPath)) {
-        resumeModelPath = trackFinalPath;
     } else {
         fs::path latest = find_latest_episode_model(trackProfileDir);
         if (!latest.empty()) {
             resumeModelPath = latest;
+        } else if (fs::is_regular_file(trackFinalPath)) {
+            resumeModelPath = trackFinalPath;
+        } else if (fs::is_regular_file(trackBestTimePath)) {
+            resumeModelPath = trackBestTimePath;
         } else if (fs::is_regular_file(externalBestTimePath)) {
             resumeModelPath = externalBestTimePath;
         } else if (profile == TrainingProfile::Finetune && fs::is_regular_file(externalLegacyBestTimePath)) {
