@@ -55,6 +55,8 @@ inline TrackConfig BuildSandboxTrack() {
     return t;
 }
 
+#include "generated/track_layouts_generated.h"
+
 inline TrackConfig BuildF1StubTrack(
     const std::string& slug,
     const std::string& repoId,
@@ -69,6 +71,7 @@ inline TrackConfig BuildF1StubTrack(
     t.lat = lat;
     t.lon = lon;
     t.is_stub = true;
+    ApplyGeneratedLayout(slug, t);
     return t;
 }
 
