@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <algorithm>
+#include <filesystem>
 
 // Ctrl+C support.
 volatile sig_atomic_t interrupted = 0;
@@ -493,19 +494,47 @@ int main(int argc, char* argv[]) {
     DQN dqn(STATE_SIZE, ACTION_SIZE, LEARNING_RATE, GAMMA);
     ReplayBuffer replay_buffer(REPLAY_BUFFER_SIZE);
 
-// Resume from a checkpoint
-    dqn.load_model("models/best_time.pt");
-    dqn.set_learning_rate(1e-4f);
+    namespace fs = std::filesystem;
+    fs::path modelsRoot = "models";
+    fs::path trackModelDir = modelsRoot / track.name;
+    fs::path trackBestTimePath = trackModelDir / "best_time.pt";
+    fs::path legacyBestTimePath = modelsRoot / "best_time.pt";
 
+    std::error_code ec;
+    fs::create_directories(trackModelDir, ec);
+    if (ec) {
+        std::cerr << "Failed to create model directory: " << trackModelDir.string()
+                  << " (" << ec.message() << ")\n";
+        UnloadImage(trackImage);
+        return 1;
+    }
+
+    bool resumedFromCheckpoint = false;
+    try {
+        if (fs::exists(trackBestTimePath)) {
+            dqn.load_model(trackBestTimePath.string());
+            dqn.set_learning_rate(1e-4f);
+            resumedFromCheckpoint = true;
+            std::cout << "Resumed from: " << trackBestTimePath.string() << "\n";
+        } else if (fs::exists(legacyBestTimePath)) {
+            dqn.load_model(legacyBestTimePath.string());
+            dqn.set_learning_rate(1e-4f);
+            resumedFromCheckpoint = true;
+            std::cout << "Resumed from legacy checkpoint: " << legacyBestTimePath.string() << "\n";
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to load checkpoint: " << e.what() << "\n";
+        UnloadImage(trackImage);
+        return 1;
+    }
+
+    if (!resumedFromCheckpoint) {
+        std::cout << "No checkpoint found for track. Starting training from scratch.\n";
+    }
+	
 float epsilon = EPSILON_START;
     TrainingStats stats;
-
-#ifdef _WIN32
-    system("if not exist models mkdir models");
-#else
-    system("mkdir -p models");
-#endif
-
+	
     auto training_start = std::chrono::steady_clock::now();
 
     double best_finish_rate = -1.0;
@@ -808,10 +837,10 @@ float epsilon = EPSILON_START;
         }
 
         if (episode % MILESTONE_FREQUENCY == 0) {
-            std::string model_path = "models/model_episode_" + std::to_string(episode) + ".pt";
+            std::string model_path = (trackModelDir / ("model_episode_" + std::to_string(episode) + ".pt")).string();
             dqn.save_model(model_path);
 
-            std::string stats_path = "models/training_stats_" + std::to_string(episode) + ".csv";
+            std::string stats_path = (trackModelDir / ("training_stats_" + std::to_string(episode) + ".csv")).string();
             std::ofstream stats_file(stats_path);
 
             stats_file << "episode,reward,length,avg_loss,laps,finished\n";
@@ -872,8 +901,9 @@ float epsilon = EPSILON_START;
 
             if (save_finish_rate) {
                 best_finish_rate = eval.finish_rate;
-                dqn.save_model("models/best_finish_rate.pt");
-                std::cout << "★ Updated best_finish_rate.pt (finish_rate="
+                std::string best_finish_path = (trackModelDir / "best_finish_rate.pt").string();
+                dqn.save_model(best_finish_path);
+                std::cout << "★ Updated " << best_finish_path << " (finish_rate="
                         << std::fixed << std::setprecision(3) << best_finish_rate << ")\n";
             }
 
@@ -888,8 +918,9 @@ float epsilon = EPSILON_START;
 
             if (save_time) {
                 best_time_avg_steps_finish = eval.avg_steps_finish;
-                dqn.save_model("models/best_time.pt");
-                std::cout << "★ Updated best_time.pt (avg_steps_finish="
+                std::string best_time_path = trackBestTimePath.string();
+                dqn.save_model(best_time_path);
+                std::cout << "★ Updated " << best_time_path << " (avg_steps_finish="
                             << std::fixed << std::setprecision(1) << best_time_avg_steps_finish << ")\n";
             }
 
@@ -904,8 +935,9 @@ float epsilon = EPSILON_START;
 
             if (save_score) {
                 best_score = eval.avg_score;
-                dqn.save_model("models/best_score.pt");
-                std::cout << "★ Updated best_score.pt (avg_score="
+                std::string best_score_path = (trackModelDir / "best_score.pt").string();
+                dqn.save_model(best_score_path);
+                std::cout << "★ Updated " << best_score_path << " (avg_score="
                         << std::fixed << std::setprecision(1) << best_score << ")\n";
             }
 
@@ -915,7 +947,8 @@ float epsilon = EPSILON_START;
 
     if (interrupted) {
         std::cout << "\n\nInterrupted! Saving final model...\n";
-        dqn.save_model("models/model_final.pt");
+        std::string final_path = (trackModelDir / "model_final.pt").string();
+        dqn.save_model(final_path);
         std::cout << "Final model saved. Safe to exit.\n";
     }
 
