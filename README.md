@@ -141,8 +141,16 @@ Replay runs in real time and renders the environment, vehicle, and perception ra
 To train a new agent:
 
 ```bash
-./racing_trainer --track sandbox
+./racing_trainer --track sandbox --profile base
 ```
+
+To fine-tune a track from a base checkpoint:
+
+```bash
+./racing_trainer --track australian-gp --profile finetune --init-model ../trainedModels/base/best.pt
+```
+
+`--profile auto` chooses `base` for `sandbox` and `finetune` for non-sandbox tracks.
 
 To train with live visualization (slower):
 
@@ -181,7 +189,7 @@ Track definitions are centralized in `track_config.h` (name, image path, spawn, 
 
 - Default track: `sandbox`
 - Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
-- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--render] [--render-trace] [--reset-training]`
+- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--render] [--render-trace] [--reset-training]`
 
 F1 tracks are generated from `f1-circuits.geojson` with:
 

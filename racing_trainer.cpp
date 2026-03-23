@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <unordered_map>
+#include <cctype>
 
 // Ctrl+C support.
 volatile sig_atomic_t interrupted = 0;
@@ -506,8 +507,17 @@ static EvalResult EvaluateGreedy(
 int main(int argc, char* argv[]) {
     signal(SIGINT, signal_handler);
 
+    enum class TrainingProfile {
+        Auto,
+        Base,
+        Finetune
+    };
+
     int MILESTONE_FREQUENCY = 50;
     std::string trackName = "sandbox";
+    std::string initModelPathArg;
+    TrainingProfile profile = TrainingProfile::Auto;
+    std::string profileLabel = "auto";
     bool ENABLE_RENDER = false;
     bool ENABLE_RENDER_TRACE = false;
     bool RESET_TRAINING = false;
@@ -517,10 +527,10 @@ int main(int argc, char* argv[]) {
     float LEARNING_RATE = 0.001f;
 
     const float GAMMA = 0.99f;
-    const float EPSILON_START = 1.0f;
-    const float EPSILON_END = 0.005f;
-    const float EPSILON_DECAY = 0.995f;
-    const int WARMUP_EPISODES = 5;
+    float EPSILON_START = 1.0f;
+    float EPSILON_END = 0.005f;
+    float EPSILON_DECAY = 0.995f;
+    int WARMUP_EPISODES = 5;
 
     const int TRAIN_EVERY_N_STEPS = 3;
     const int max_steps = 7500;
@@ -533,6 +543,33 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             trackName = argv[++i];
+        } else if (arg == "--profile") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --profile (expected: auto|base|finetune)\n";
+                return 1;
+            }
+            std::string p = argv[++i];
+            std::string lower = p;
+            std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            if (lower == "auto") {
+                profile = TrainingProfile::Auto;
+                profileLabel = "auto";
+            } else if (lower == "base") {
+                profile = TrainingProfile::Base;
+                profileLabel = "base";
+            } else if (lower == "finetune") {
+                profile = TrainingProfile::Finetune;
+                profileLabel = "finetune";
+            } else {
+                std::cerr << "Invalid value for --profile: " << p << " (expected: auto|base|finetune)\n";
+                return 1;
+            }
+        } else if (arg == "--init-model") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --init-model\n";
+                return 1;
+            }
+            initModelPathArg = argv[++i];
         } else if (arg == "--render") {
             ENABLE_RENDER = true;
         } else if (arg == "--render-trace") {
@@ -546,8 +583,9 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--render] [--render-trace] [--reset-training]\n";
-            std::cout << "Example: racing_trainer --milestone 50 --track sandbox --render --render-trace --reset-training\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--render] [--render-trace] [--reset-training]\n";
+            std::cout << "Example (base): racing_trainer --track sandbox --profile base --render\n";
+            std::cout << "Example (finetune): racing_trainer --track australian-gp --profile finetune --init-model ../trainedModels/base/best.pt\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -568,15 +606,47 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (profile == TrainingProfile::Auto) {
+        if (track.name == "sandbox") {
+            profile = TrainingProfile::Base;
+            profileLabel = "base(auto)";
+        } else {
+            profile = TrainingProfile::Finetune;
+            profileLabel = "finetune(auto)";
+        }
+    }
+
+    if (profile == TrainingProfile::Base) {
+        LEARNING_RATE = 0.001f;
+        EPSILON_START = 1.0f;
+        EPSILON_END = 0.005f;
+        EPSILON_DECAY = 0.995f;
+        WARMUP_EPISODES = 5;
+    } else {
+        LEARNING_RATE = 3e-4f;
+        EPSILON_START = 0.25f;
+        EPSILON_END = 0.005f;
+        EPSILON_DECAY = 0.997f;
+        WARMUP_EPISODES = 2;
+    }
+
     std::cout << "=== Racing DQN Training (CPU Optimized) ===\n";
     std::cout << "Milestone frequency: " << MILESTONE_FREQUENCY << " episodes\n";
     std::cout << "Track: " << track.name << "\n";
+    std::cout << "Profile: " << profileLabel << "\n";
+    if (!initModelPathArg.empty()) {
+        std::cout << "Init model: " << initModelPathArg << "\n";
+    }
     std::cout << "Car scale: " << std::fixed << std::setprecision(3) << track.car_scale << "\n";
     if (track.is_stub) {
         std::cout << "WARNING: track '" << track.name
                   << "' is a stub and currently uses sandbox geometry.\n";
     }
     std::cout << "Batch size: " << BATCH_SIZE << "\n";
+    std::cout << "LR: " << std::scientific << LEARNING_RATE << std::fixed << "\n";
+    std::cout << "Epsilon schedule: start=" << std::setprecision(3) << EPSILON_START
+              << " end=" << EPSILON_END << " decay=" << EPSILON_DECAY << "\n";
+    std::cout << "Warmup episodes: " << WARMUP_EPISODES << "\n";
     std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
     std::cout << "Render trace: " << ((ENABLE_RENDER && ENABLE_RENDER_TRACE) ? "on" : "off") << "\n";
     std::cout << "Reset training: " << (RESET_TRAINING ? "yes" : "no") << "\n";
@@ -683,7 +753,11 @@ int main(int argc, char* argv[]) {
         return bestPath;
     };
 
-    if (fs::is_regular_file(trackBestTimePath)) {
+    bool useFreshScheduler = false;
+    if (!initModelPathArg.empty()) {
+        resumeModelPath = initModelPathArg;
+        useFreshScheduler = true;
+    } else if (fs::is_regular_file(trackBestTimePath)) {
         resumeModelPath = trackBestTimePath;
     } else if (fs::is_regular_file(trackFinalPath)) {
         resumeModelPath = trackFinalPath;
@@ -700,7 +774,11 @@ int main(int argc, char* argv[]) {
     try {
         if (!resumeModelPath.empty()) {
             dqn.load_model(resumeModelPath.string());
-            dqn.set_learning_rate(1e-4f);
+            if (profile == TrainingProfile::Finetune) {
+                dqn.set_learning_rate(1e-4f);
+            } else {
+                dqn.set_learning_rate(LEARNING_RATE);
+            }
             resumedFromCheckpoint = true;
             std::cout << "Resumed from: " << resumeModelPath.string() << "\n";
         }
@@ -740,7 +818,7 @@ float epsilon = EPSILON_START;
     bool lr_dropped_once = false;
     bool lr_dropped_twice = false;
 
-    if (fs::is_regular_file(trackStatePath)) {
+    if (!useFreshScheduler && fs::is_regular_file(trackStatePath)) {
         std::ifstream stateFile(trackStatePath);
         std::unordered_map<std::string, std::string> state;
         std::string line;
@@ -763,6 +841,8 @@ float epsilon = EPSILON_START;
         } catch (...) {
             std::cout << "Warning: invalid training state file, continuing with default scheduler state.\n";
         }
+    } else if (useFreshScheduler && resumedFromCheckpoint) {
+        std::cout << "Loaded init model with fresh scheduler state (episode=1, profile defaults).\n";
     } else if (resumedFromCheckpoint) {
         std::cout << "Checkpoint loaded, but no training_state.txt found. Continuing with default scheduler state.\n";
     }
