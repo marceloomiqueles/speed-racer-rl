@@ -175,6 +175,10 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `clean` -> `pace` when finish rate and wall-hit stability are good
 - `pace` -> `corner` when finish pace improves consistently
 
+Trainer also applies a wrong-way control during learning:
+- sustained wrong-way movement gets increasing reward penalty
+- persistent wrong-way movement triggers early episode termination
+
 ### Episode Budget and Evaluation
 
 Recommended episode budgets (practical ranges):

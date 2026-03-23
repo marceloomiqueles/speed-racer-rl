@@ -1038,12 +1038,16 @@ float epsilon = EPSILON_START;
         const float STUCK_DIST_THRESHOLD = 30.0f;
         const int STUCK_STRIKES_MAX = 3;
         const float STUCK_BREAK_PENALTY = 50.0f;
-        const float WRONG_WAY_PENALTY = 0.08f;
-        const float WRONG_WAY_SPEED_MIN = 20.0f;
-        const float WRONG_WAY_DOT_THRESHOLD = -0.20f;
-        const int WRONG_WAY_GRACE_FRAMES = 8;
+        const float WRONG_WAY_PENALTY = 0.30f;
+        const float WRONG_WAY_TERMINATE_PENALTY = 120.0f;
+        const float WRONG_WAY_SPEED_MIN = 12.0f;
+        const float WRONG_WAY_DOT_THRESHOLD = -0.05f;
+        const float WRONG_WAY_PROGRESS_THRESHOLD = -0.30f;
+        const int WRONG_WAY_GRACE_FRAMES = 4;
+        const int WRONG_WAY_TERMINATE_FRAMES = 30;
         int wrongWayCounter = 0;
         bool wrongWayActive = false;
+        bool wrongWayTerminated = false;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
             ? get_stage_params(curriculumStage)
             : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
@@ -1190,8 +1194,8 @@ float epsilon = EPSILON_START;
             }
 
             // Penalize driving against local track direction (wrong-way).
-            // Local track direction is approximated by vector from next checkpoint midpoint
-            // to the following checkpoint midpoint.
+            // Use both directional alignment and sustained negative progress
+            // to avoid false negatives in some track segments.
             const int cpA = nextCheckpoint;
             const int cpB = (nextCheckpoint + 1) % (int)checkpoints.size();
             Vector2 mA = CheckpointMid(checkpoints, cpA);
@@ -1199,6 +1203,7 @@ float epsilon = EPSILON_START;
             Vector2 trackDir = {mB.x - mA.x, mB.y - mA.y};
             float trackDirLen = sqrtf(trackDir.x * trackDir.x + trackDir.y * trackDir.y);
             float speedAbs = fabs(speed);
+            bool wrongWayByDirection = false;
             if (trackDirLen > 1e-3f && speedAbs > WRONG_WAY_SPEED_MIN) {
                 trackDir.x /= trackDirLen;
                 trackDir.y /= trackDirLen;
@@ -1208,18 +1213,23 @@ float epsilon = EPSILON_START;
                     carDir.y = -carDir.y;
                 }
                 float dirDot = carDir.x * trackDir.x + carDir.y * trackDir.y;
-                if (dirDot < WRONG_WAY_DOT_THRESHOLD) {
-                    wrongWayCounter++;
-                } else {
-                    wrongWayCounter = 0;
-                }
-                wrongWayActive = (wrongWayCounter > WRONG_WAY_GRACE_FRAMES);
-                if (wrongWayActive) {
-                    reward -= WRONG_WAY_PENALTY * speedAbs * DT;
-                }
+                wrongWayByDirection = (dirDot < WRONG_WAY_DOT_THRESHOLD);
+            }
+            bool wrongWayByProgress = (speedAbs > WRONG_WAY_SPEED_MIN &&
+                                       progress < WRONG_WAY_PROGRESS_THRESHOLD);
+
+            if (wrongWayByDirection || wrongWayByProgress) {
+                wrongWayCounter++;
             } else {
-                wrongWayCounter = 0;
-                wrongWayActive = false;
+                wrongWayCounter = std::max(0, wrongWayCounter - 1);
+            }
+            wrongWayActive = (wrongWayCounter > WRONG_WAY_GRACE_FRAMES);
+            if (wrongWayActive) {
+                reward -= WRONG_WAY_PENALTY * speedAbs * DT;
+                if (wrongWayCounter > WRONG_WAY_TERMINATE_FRAMES) {
+                    reward -= WRONG_WAY_TERMINATE_PENALTY;
+                    wrongWayTerminated = true;
+                }
             }
 
             if (hitWall) reward -= stageParams.wall_hit_penalty;
@@ -1291,7 +1301,7 @@ float epsilon = EPSILON_START;
             episode_steps++;
 
             std::vector<float> next_state = GetState(trackImage, position, angle, speed);
-            bool done = raceFinished || episode_steps >= max_steps;
+            bool done = raceFinished || episode_steps >= max_steps || wrongWayTerminated;
 
             replay_buffer.add(state, action, reward, next_state, done);
 
