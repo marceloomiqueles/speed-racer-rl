@@ -741,6 +741,7 @@ int main(int argc, char* argv[]) {
 
     std::vector<Checkpoint> checkpointsTemplate = BuildCheckpoints(track);
     const size_t TRACE_MAX_POINTS = 100;
+    const std::string profileStorageKey = (profile == TrainingProfile::Base) ? "base" : "finetune";
 
     const float MAX_SPEED = 300.0f;
     const float ACCELERATION = 150.0f;
@@ -758,50 +759,68 @@ int main(int argc, char* argv[]) {
 
     namespace fs = std::filesystem;
     fs::path modelsRoot = "models";
-    fs::path trackModelDir = modelsRoot / track.name;
-    fs::path trackBestTimePath = trackModelDir / "best_time.pt";
-    fs::path trackStatePath = trackModelDir / "training_state.txt";
+    fs::path trackModelDirLegacy = modelsRoot / track.name;
+    fs::path trackProfileDir = trackModelDirLegacy / profileStorageKey;
+    fs::path trackBestTimePath = trackProfileDir / "best_time.pt";
+    fs::path trackStatePath = trackProfileDir / "training_state.txt";
     fs::path externalModelsRoot = fs::path("..") / "trainedModels";
-    fs::path externalTrackModelDir = externalModelsRoot / track.name;
-    fs::path externalBestTimePath = externalTrackModelDir / "best_time.pt";
-    fs::path trackFinalPath = trackModelDir / "model_final.pt";
+    fs::path externalTrackModelDirLegacy = externalModelsRoot / track.name;
+    fs::path externalTrackProfileDir = externalTrackModelDirLegacy / profileStorageKey;
+    fs::path externalBestTimePath = externalTrackProfileDir / "best_time.pt";
+    fs::path externalLegacyBestTimePath = externalTrackModelDirLegacy / "best_time.pt";
+    fs::path trackFinalPath = trackProfileDir / "model_final.pt";
     fs::path resumeModelPath;
 
     std::error_code ec;
     if (RESET_TRAINING) {
-        fs::remove_all(trackModelDir, ec);
+        fs::remove_all(trackProfileDir, ec);
         if (ec) {
-            std::cerr << "Failed to reset local track model directory: " << trackModelDir.string()
+            std::cerr << "Failed to reset local track profile directory: " << trackProfileDir.string()
                       << " (" << ec.message() << ")\n";
             UnloadImage(trackImage);
             return 1;
         }
 
         ec.clear();
-        fs::remove_all(externalTrackModelDir, ec);
+        fs::remove_all(externalTrackProfileDir, ec);
         if (ec) {
-            std::cerr << "Failed to reset external track model directory: " << externalTrackModelDir.string()
+            std::cerr << "Failed to reset external track profile directory: " << externalTrackProfileDir.string()
                       << " (" << ec.message() << ")\n";
             UnloadImage(trackImage);
             return 1;
         }
-        std::cout << "Training reset complete for track '" << track.name << "'.\n";
+        std::cout << "Training reset complete for track '" << track.name
+                  << "' profile '" << profileStorageKey << "'.\n";
     }
 
     ec.clear();
-    fs::create_directories(trackModelDir, ec);
+    fs::create_directories(trackProfileDir, ec);
     if (ec) {
-        std::cerr << "Failed to create model directory: " << trackModelDir.string()
+        std::cerr << "Failed to create model directory: " << trackProfileDir.string()
                   << " (" << ec.message() << ")\n";
         UnloadImage(trackImage);
         return 1;
     }
 
     ec.clear();
-    fs::create_directories(externalTrackModelDir, ec);
+    fs::create_directories(trackModelDirLegacy, ec);
+    if (ec) {
+        std::cerr << "Warning: failed to create legacy model directory: "
+                  << trackModelDirLegacy.string() << " (" << ec.message() << ")\n";
+    }
+
+    ec.clear();
+    fs::create_directories(externalTrackProfileDir, ec);
     if (ec) {
         std::cerr << "Warning: failed to create external model directory: "
-                  << externalTrackModelDir.string() << " (" << ec.message() << ")\n";
+                  << externalTrackProfileDir.string() << " (" << ec.message() << ")\n";
+    }
+
+    ec.clear();
+    fs::create_directories(externalTrackModelDirLegacy, ec);
+    if (ec) {
+        std::cerr << "Warning: failed to create external legacy model directory: "
+                  << externalTrackModelDirLegacy.string() << " (" << ec.message() << ")\n";
     }
 
     auto find_latest_episode_model = [&](const fs::path& dir) -> fs::path {
@@ -832,7 +851,9 @@ int main(int argc, char* argv[]) {
     };
 
     bool useFreshScheduler = false;
-    if (!initModelPathArg.empty()) {
+    if (RESET_TRAINING) {
+        // Explicit reset always starts without implicit checkpoint fallback.
+    } else if (!initModelPathArg.empty()) {
         resumeModelPath = initModelPathArg;
         useFreshScheduler = true;
     } else if (fs::is_regular_file(trackBestTimePath)) {
@@ -840,11 +861,14 @@ int main(int argc, char* argv[]) {
     } else if (fs::is_regular_file(trackFinalPath)) {
         resumeModelPath = trackFinalPath;
     } else {
-        fs::path latest = find_latest_episode_model(trackModelDir);
+        fs::path latest = find_latest_episode_model(trackProfileDir);
         if (!latest.empty()) {
             resumeModelPath = latest;
         } else if (fs::is_regular_file(externalBestTimePath)) {
             resumeModelPath = externalBestTimePath;
+        } else if (profile == TrainingProfile::Finetune && fs::is_regular_file(externalLegacyBestTimePath)) {
+            // Backward compatibility with old path and replay default model location.
+            resumeModelPath = externalLegacyBestTimePath;
         }
     }
 
@@ -1396,10 +1420,10 @@ float epsilon = EPSILON_START;
         }
 
         if (episode % MILESTONE_FREQUENCY == 0) {
-            std::string model_path = (trackModelDir / ("model_episode_" + std::to_string(episode) + ".pt")).string();
+            std::string model_path = (trackProfileDir / ("model_episode_" + std::to_string(episode) + ".pt")).string();
             dqn.save_model(model_path);
 
-            std::string stats_path = (trackModelDir / ("training_stats_" + std::to_string(episode) + ".csv")).string();
+            std::string stats_path = (trackProfileDir / ("training_stats_" + std::to_string(episode) + ".csv")).string();
             std::ofstream stats_file(stats_path);
 
             stats_file << "episode,reward,length,avg_loss,laps,finished\n";
@@ -1461,7 +1485,7 @@ float epsilon = EPSILON_START;
 
             if (save_finish_rate) {
                 best_finish_rate = eval.finish_rate;
-                std::string best_finish_path = (trackModelDir / "best_finish_rate.pt").string();
+                std::string best_finish_path = (trackProfileDir / "best_finish_rate.pt").string();
                 dqn.save_model(best_finish_path);
                 std::cout << "★ Updated " << best_finish_path << " (finish_rate="
                         << std::fixed << std::setprecision(3) << best_finish_rate << ")\n";
@@ -1483,10 +1507,19 @@ float epsilon = EPSILON_START;
                 std::cout << "★ Updated " << best_time_path << " (avg_steps_finish="
                             << std::fixed << std::setprecision(1) << best_time_avg_steps_finish << ")\n";
 
-                if (fs::is_directory(externalTrackModelDir)) {
+                if (fs::is_directory(externalTrackProfileDir)) {
                     std::string external_best_time_path = externalBestTimePath.string();
                     dqn.save_model(external_best_time_path);
                     std::cout << "★ Exported " << external_best_time_path << "\n";
+                }
+                if (profile == TrainingProfile::Finetune && fs::is_directory(trackModelDirLegacy)) {
+                    fs::path legacyBest = trackModelDirLegacy / "best_time.pt";
+                    dqn.save_model(legacyBest.string());
+                    std::cout << "★ Updated legacy replay path " << legacyBest.string() << "\n";
+                }
+                if (profile == TrainingProfile::Finetune && fs::is_directory(externalTrackModelDirLegacy)) {
+                    dqn.save_model(externalLegacyBestTimePath.string());
+                    std::cout << "★ Exported legacy replay path " << externalLegacyBestTimePath.string() << "\n";
                 }
             }
 
@@ -1501,7 +1534,7 @@ float epsilon = EPSILON_START;
 
             if (save_score) {
                 best_score = eval.avg_score;
-                std::string best_score_path = (trackModelDir / "best_score.pt").string();
+                std::string best_score_path = (trackProfileDir / "best_score.pt").string();
                 dqn.save_model(best_score_path);
                 std::cout << "★ Updated " << best_score_path << " (avg_score="
                         << std::fixed << std::setprecision(1) << best_score << ")\n";
@@ -1562,7 +1595,7 @@ float epsilon = EPSILON_START;
                     curriculumStableEvals = 0;
                     curriculumStageEntryBestSteps = -1.0;
                     apply_curriculum_stage(curriculumStage, true);
-                    std::string stage_path = (trackModelDir / ("stage_" + std::string(stage_to_string(curriculumStage)) + ".pt")).string();
+                    std::string stage_path = (trackProfileDir / ("stage_" + std::string(stage_to_string(curriculumStage)) + ".pt")).string();
                     dqn.save_model(stage_path);
                     std::cout << "▲ Curriculum promoted to stage '" << stage_to_string(curriculumStage)
                               << "' and checkpoint saved: " << stage_path << "\n";
@@ -1576,7 +1609,7 @@ float epsilon = EPSILON_START;
 
     if (interrupted) {
         std::cout << "\n\nInterrupted! Saving final model...\n";
-        std::string final_path = (trackModelDir / "model_final.pt").string();
+        std::string final_path = (trackProfileDir / "model_final.pt").string();
         dqn.save_model(final_path);
         save_training_state(startEpisode + (int)stats.episode_rewards.size());
         std::cout << "Final model saved. Safe to exit.\n";

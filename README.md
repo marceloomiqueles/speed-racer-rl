@@ -207,10 +207,13 @@ To reset a track training run (checkpoints + scheduler state) and restart from e
 ./racing_trainer --track sandbox --reset-training
 ```
 
+`--reset-training` resets only the active profile (`base` or `finetune`) for that track.
+
 Training runs headless and periodically saves model checkpoints.
-Checkpoints are stored per track in `build/models/<track_name>/` (for example `build/models/sandbox/best_time.pt`).
-Best-time checkpoints are also exported outside `build` to `trainedModels/<track_name>/best_time.pt`.
-Training scheduler state (`episode_next`, `epsilon`, learning-rate schedule) is saved in `build/models/<track_name>/training_state.txt`.
+Checkpoints are stored per track and profile in `build/models/<track_name>/<profile>/` (for example `build/models/sandbox/base/best_time.pt`).
+Best-time checkpoints are also exported outside `build` to `trainedModels/<track_name>/<profile>/best_time.pt`.
+For replay compatibility, fine-tune best-time is mirrored to `build/models/<track_name>/best_time.pt` and `trainedModels/<track_name>/best_time.pt`.
+Training scheduler state (`episode_next`, `epsilon`, learning-rate schedule) is saved in `build/models/<track_name>/<profile>/training_state.txt`.
 Per-track runtime overrides can be set in `track_overrides.csv` (for example `australian-gp,0.08` to shrink the car sprite on that track) without recompiling.
 
 Exact behavior (episode length, epsilon schedule, learning rate, etc.) is defined in code and can be adjusted in `racing_trainer.cpp`.
