@@ -8,6 +8,11 @@
 #include <string>
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <unordered_map>
+#include <ctime>
 
 // Track pixel helpers
 bool IsWall(Color color) {
@@ -57,6 +62,101 @@ static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
         checkpoints.push_back({cp.start, cp.end, false});
     }
     return checkpoints;
+}
+
+struct AiLapRecord {
+    double time_seconds = 1e18;
+    std::string time_text;
+    std::string model;
+    std::string updated_at_utc;
+    std::string source;
+};
+
+static std::string FormatLapSeconds(double sec) {
+    if (sec < 0.0) return "";
+    int minutes = (int)(sec / 60.0);
+    double rem = sec - (double)minutes * 60.0;
+    std::ostringstream oss;
+    oss << minutes << ":" << std::fixed << std::setprecision(3) << std::setw(6) << std::setfill('0') << rem;
+    return oss.str();
+}
+
+static std::string NowUtcIso8601() {
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &t);
+#else
+    gmtime_r(&t, &tm);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+    return std::string(buf);
+}
+
+static std::filesystem::path ResolveAiRecordsPath() {
+    namespace fs = std::filesystem;
+    if (fs::exists("README.md")) return fs::path("tracks_ai_records.csv");
+    if (fs::exists(fs::path("..") / "README.md")) return fs::path("..") / "tracks_ai_records.csv";
+    return fs::path("tracks_ai_records.csv");
+}
+
+static std::unordered_map<std::string, AiLapRecord> LoadAiLapRecords(const std::filesystem::path& path) {
+    std::unordered_map<std::string, AiLapRecord> out;
+    std::ifstream in(path);
+    if (!in.is_open()) return out;
+
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        if (line.rfind("track_slug,", 0) == 0) continue;
+        std::stringstream ss(line);
+        std::string slug, sec, timeText, model, updated, source;
+        if (!std::getline(ss, slug, ',')) continue;
+        if (!std::getline(ss, sec, ',')) continue;
+        if (!std::getline(ss, timeText, ',')) continue;
+        if (!std::getline(ss, model, ',')) continue;
+        if (!std::getline(ss, updated, ',')) continue;
+        std::getline(ss, source);
+        try {
+            AiLapRecord rec;
+            rec.time_seconds = std::stod(sec);
+            rec.time_text = timeText;
+            rec.model = model;
+            rec.updated_at_utc = updated;
+            rec.source = source;
+            out[slug] = rec;
+        } catch (...) {
+        }
+    }
+    return out;
+}
+
+static bool SaveAiLapRecords(const std::filesystem::path& path,
+                             const std::unordered_map<std::string, AiLapRecord>& records) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (path.has_parent_path()) {
+        fs::create_directories(path.parent_path(), ec);
+    }
+    std::ofstream out(path, std::ios::trunc);
+    if (!out.is_open()) return false;
+
+    out << "track_slug,time_seconds,time_text,model,updated_at_utc,source\n";
+    std::vector<std::string> keys;
+    keys.reserve(records.size());
+    for (const auto& kv : records) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    for (const auto& slug : keys) {
+        const auto& r = records.at(slug);
+        out << slug << ","
+            << std::fixed << std::setprecision(3) << r.time_seconds << ","
+            << r.time_text << ","
+            << r.model << ","
+            << r.updated_at_utc << ","
+            << r.source << "\n";
+    }
+    return true;
 }
 
 // LIDAR sensor with visualization
@@ -319,6 +419,12 @@ int main(int argc, char* argv[]) {
 
     bool showLidar = true;
     int consecutiveWallHits = 0;
+    std::filesystem::path aiRecordsPath = ResolveAiRecordsPath();
+    auto aiRecords = LoadAiLapRecords(aiRecordsPath);
+    auto itRec = aiRecords.find(track.name);
+    if (itRec != aiRecords.end() && itRec->second.time_seconds < bestLapTime) {
+        bestLapTime = (float)itRec->second.time_seconds;
+    }
 
     SetTargetFPS(60);
 
@@ -463,7 +569,25 @@ int main(int argc, char* argv[]) {
                         if (allCrossed) {
                             cp.crossed = true;
                             lapTimes.push_back(currentLapTime);
-                            if (currentLapTime < bestLapTime) bestLapTime = currentLapTime;
+                            if (currentLapTime < bestLapTime) {
+                                bestLapTime = currentLapTime;
+                                AiLapRecord rec;
+                                rec.time_seconds = (double)currentLapTime;
+                                rec.time_text = FormatLapSeconds(rec.time_seconds);
+                                rec.model = std::filesystem::path(modelPath).filename().string();
+                                rec.updated_at_utc = NowUtcIso8601();
+                                rec.source = "ai_replay";
+                                aiRecords[track.name] = rec;
+                                if (SaveAiLapRecords(aiRecordsPath, aiRecords)) {
+                                    std::cout << "★ AI lap record updated for " << track.name
+                                              << ": " << rec.time_text
+                                              << " (" << rec.time_seconds << "s) @ " << aiRecordsPath.string()
+                                              << "\n";
+                                } else {
+                                    std::cout << "Warning: failed to write AI lap records to "
+                                              << aiRecordsPath.string() << "\n";
+                                }
+                            }
 
                             currentLap++;
                             currentLapTime = 0.0f;

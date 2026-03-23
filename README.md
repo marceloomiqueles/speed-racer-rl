@@ -135,6 +135,8 @@ Or use auto mode (loads `models/<track>/best_time.pt` and falls back to `../trai
 ```
 
 Replay runs in real time and renders the environment, vehicle, and perception rays.
+When replay sets a better AI lap time for a track, it updates `tracks_ai_records.csv`
+with the best `time_seconds`, formatted time, model name, and UTC timestamp.
 
 ## Training
 
