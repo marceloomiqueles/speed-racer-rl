@@ -1038,14 +1038,15 @@ float epsilon = EPSILON_START;
         const float STUCK_DIST_THRESHOLD = 30.0f;
         const int STUCK_STRIKES_MAX = 3;
         const float STUCK_BREAK_PENALTY = 50.0f;
-        const float WRONG_WAY_PENALTY = 0.30f;
-        const float WRONG_WAY_TERMINATE_PENALTY = 120.0f;
-        const float WRONG_WAY_SPEED_MIN = 12.0f;
-        const float WRONG_WAY_DOT_THRESHOLD = -0.05f;
-        const float WRONG_WAY_PROGRESS_THRESHOLD = -0.30f;
-        const int WRONG_WAY_GRACE_FRAMES = 4;
-        const int WRONG_WAY_TERMINATE_FRAMES = 30;
-        int wrongWayCounter = 0;
+        const float WRONG_WAY_PENALTY = 0.40f;
+        const float WRONG_WAY_TERMINATE_PENALTY = 180.0f;
+        const float WRONG_WAY_SPEED_MIN = 10.0f;
+        const float WRONG_WAY_DOT_THRESHOLD = -0.02f;
+        const float WRONG_WAY_PROGRESS_THRESHOLD = -0.20f;
+        const float WRONG_WAY_SCORE_ACTIVATE = 5.0f;
+        const float WRONG_WAY_SCORE_TERMINATE = 25.0f;
+        const float WRONG_WAY_SCORE_DECAY = 0.75f;
+        float wrongWayScore = 0.0f;
         bool wrongWayActive = false;
         bool wrongWayTerminated = false;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
@@ -1218,15 +1219,28 @@ float epsilon = EPSILON_START;
             bool wrongWayByProgress = (speedAbs > WRONG_WAY_SPEED_MIN &&
                                        progress < WRONG_WAY_PROGRESS_THRESHOLD);
 
-            if (wrongWayByDirection || wrongWayByProgress) {
-                wrongWayCounter++;
-            } else {
-                wrongWayCounter = std::max(0, wrongWayCounter - 1);
+            bool wrongWayByCheckpointFlow = false;
+            if (currentLap > 0) {
+                int prevCheckpoint = (nextCheckpoint - 1 + (int)checkpoints.size()) % (int)checkpoints.size();
+                if (prevCheckpoint != nextCheckpoint &&
+                    checkpoints[prevCheckpoint].CheckCrossing(prevPosition, position)) {
+                    wrongWayByCheckpointFlow = true;
+                }
             }
-            wrongWayActive = (wrongWayCounter > WRONG_WAY_GRACE_FRAMES);
+
+            if (wrongWayByCheckpointFlow) {
+                wrongWayScore += 8.0f;
+                reward -= 15.0f;
+            } else if (wrongWayByDirection || wrongWayByProgress) {
+                wrongWayScore += 1.0f;
+            } else {
+                wrongWayScore = std::max(0.0f, wrongWayScore - WRONG_WAY_SCORE_DECAY);
+            }
+
+            wrongWayActive = (wrongWayScore >= WRONG_WAY_SCORE_ACTIVATE);
             if (wrongWayActive) {
                 reward -= WRONG_WAY_PENALTY * speedAbs * DT;
-                if (wrongWayCounter > WRONG_WAY_TERMINATE_FRAMES) {
+                if (wrongWayScore >= WRONG_WAY_SCORE_TERMINATE) {
                     reward -= WRONG_WAY_TERMINATE_PENALTY;
                     wrongWayTerminated = true;
                 }
