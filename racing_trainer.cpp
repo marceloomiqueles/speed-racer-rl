@@ -457,6 +457,10 @@ static EvalResult EvaluateGreedy(
                 case 5: accelerationInput = 1.0f; steeringInput =  1.0f; break;
                 case 6: break;
             }
+            // Allow "brake while turning" without expanding the action space.
+            if (fabs(steeringInput) > 0.1f && accelerationInput == 0.0f && speed > 35.0f) {
+                accelerationInput = -0.20f;
+            }
 
             int checkPixelX = (int)position.x;
             int checkPixelY = (int)position.y;
@@ -1196,6 +1200,10 @@ float epsilon = EPSILON_START;
                 case 4: accelerationInput = 1.0f; steeringInput = -1.0f; break;
                 case 5: accelerationInput = 1.0f; steeringInput =  1.0f; break;
                 case 6: break;
+            }
+            // Allow "brake while turning" without expanding the action space.
+            if (fabs(steeringInput) > 0.1f && accelerationInput == 0.0f && speed > 35.0f) {
+                accelerationInput = -0.20f;
             }
 
             int checkPixelX = (int)position.x;

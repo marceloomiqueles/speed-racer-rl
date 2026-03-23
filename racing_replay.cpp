@@ -473,6 +473,10 @@ int main(int argc, char* argv[]) {
                 case 5: accelerationInput = 1.0f; steeringInput =  1.0f; break;
                 case 6: break;
             }
+            // Keep replay physics aligned with trainer: light braking while turning at speed.
+            if (fabs(steeringInput) > 0.1f && accelerationInput == 0.0f && speed > 35.0f) {
+                accelerationInput = -0.20f;
+            }
 
 // Surface detection
             int checkPixelX = (int)position.x;
