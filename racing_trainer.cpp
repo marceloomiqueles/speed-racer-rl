@@ -1060,7 +1060,7 @@ float epsilon = EPSILON_START;
                 }
 
                 if (carTexture.id > 0) {
-                    const float carTextureScale = 0.15f;
+                    const float carTextureScale = 0.10f;
                     Rectangle source = {0, 0, (float)carTexture.width, (float)carTexture.height};
                     Rectangle dest = {
                         position.x,

@@ -528,7 +528,7 @@ int main(int argc, char* argv[]) {
                 DrawText("Press SPACE to restart", screenWidth/2 - 100, screenHeight/2 + 40, 20, WHITE);
             }
 
-            float carTextureScale = 0.15f;
+            float carTextureScale = 0.10f;
             Rectangle source = {0, 0, (float)carTexture.width, (float)carTexture.height};
             Rectangle dest = { position.x, position.y, carTexture.width * carTextureScale, carTexture.height * carTextureScale };
             Vector2 origin = { carTexture.width * carTextureScale / 2.0f, carTexture.height * carTextureScale / 2.0f };
