@@ -421,9 +421,11 @@ int main(int argc, char* argv[]) {
     int consecutiveWallHits = 0;
     std::filesystem::path aiRecordsPath = ResolveAiRecordsPath();
     auto aiRecords = LoadAiLapRecords(aiRecordsPath);
+    std::string aiRecordText = "AI Record: N/A";
     auto itRec = aiRecords.find(track.name);
     if (itRec != aiRecords.end() && itRec->second.time_seconds < bestLapTime) {
         bestLapTime = (float)itRec->second.time_seconds;
+        aiRecordText = "AI Record: " + itRec->second.time_text + " (" + itRec->second.model + ")";
     }
 
     SetTargetFPS(60);
@@ -579,6 +581,7 @@ int main(int argc, char* argv[]) {
                                 rec.source = "ai_replay";
                                 aiRecords[track.name] = rec;
                                 if (SaveAiLapRecords(aiRecordsPath, aiRecords)) {
+                                    aiRecordText = "AI Record: " + rec.time_text + " (" + rec.model + ")";
                                     std::cout << "★ AI lap record updated for " << track.name
                                               << ": " << rec.time_text
                                               << " (" << rec.time_seconds << "s) @ " << aiRecordsPath.string()
@@ -666,6 +669,7 @@ int main(int argc, char* argv[]) {
             if (bestLapTime < 999999.0f) {
                 DrawText(TextFormat("Best: %.2fs", bestLapTime), 10, 90, 20, GOLD);
             }
+            DrawText(aiRecordText.c_str(), 10, 110, 18, DARKGREEN);
 
             DrawText("SPACE - Restart | L - Toggle LIDAR | ESC - Exit", 10, screenHeight - 30, 16, DARKGRAY);
 
