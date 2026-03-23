@@ -17,7 +17,8 @@
       "repo_name": "Albert Park Circuit",
       "lat": -37.846,
       "lon": 144.970,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 2,
@@ -29,7 +30,8 @@
       "repo_name": "Shanghai International Circuit",
       "lat": 31.340,
       "lon": 121.221,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 3,
@@ -41,7 +43,8 @@
       "repo_name": "Suzuka International Racing Course",
       "lat": 34.844,
       "lon": 136.534,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 4,
@@ -53,7 +56,8 @@
       "repo_name": "Bahrain International Circuit",
       "lat": 26.031,
       "lon": 50.512,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 5,
@@ -65,7 +69,8 @@
       "repo_name": "Jeddah Corniche Circuit",
       "lat": 21.632,
       "lon": 39.104,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 6,
@@ -77,7 +82,8 @@
       "repo_name": "Miami International Autodrome",
       "lat": 25.958,
       "lon": -80.239,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 7,
@@ -89,7 +95,8 @@
       "repo_name": "Circuit Gilles-Villeneuve",
       "lat": 45.506,
       "lon": -73.525,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 8,
@@ -102,7 +109,8 @@
       "lat": 43.737,
       "lon": 7.429,
       "normalization_applied": true,
-      "normalization_note": "Monte Carlo from calendar mapped to Monaco in circuits repo"
+      "normalization_note": "Monte Carlo from calendar mapped to Monaco in circuits repo",
+      "lap_record": null
     },
     {
       "round": 9,
@@ -114,7 +122,8 @@
       "repo_name": "Circuit de Barcelona-Catalunya",
       "lat": 41.569,
       "lon": 2.259,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 10,
@@ -126,7 +135,8 @@
       "repo_name": "Red Bull Ring",
       "lat": 47.223,
       "lon": 14.761,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 11,
@@ -138,7 +148,8 @@
       "repo_name": "Silverstone Circuit",
       "lat": 52.072,
       "lon": -1.017,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 12,
@@ -150,7 +161,8 @@
       "repo_name": "Circuit de Spa-Francorchamps",
       "lat": 50.436,
       "lon": 5.971,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 13,
@@ -162,7 +174,8 @@
       "repo_name": "Hungaroring",
       "lat": 47.583,
       "lon": 19.250,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 14,
@@ -174,7 +187,8 @@
       "repo_name": "Circuit Zandvoort",
       "lat": 52.389,
       "lon": 4.541,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 15,
@@ -186,7 +200,8 @@
       "repo_name": "Autodromo Nazionale Monza",
       "lat": 45.621,
       "lon": 9.290,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 16,
@@ -198,7 +213,8 @@
       "repo_name": "Circuito de Madring",
       "lat": 40.471,
       "lon": -3.620,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 17,
@@ -210,7 +226,8 @@
       "repo_name": "Baku City Circuit",
       "lat": 40.369,
       "lon": 49.842,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 18,
@@ -223,7 +240,8 @@
       "lat": 1.291,
       "lon": 103.859,
       "normalization_applied": true,
-      "normalization_note": "Marina Bay from calendar mapped to Singapore location in circuits repo"
+      "normalization_note": "Marina Bay from calendar mapped to Singapore location in circuits repo",
+      "lap_record": null
     },
     {
       "round": 19,
@@ -235,7 +253,8 @@
       "repo_name": "Circuit of the Americas",
       "lat": 30.135,
       "lon": -97.633,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 20,
@@ -247,7 +266,8 @@
       "repo_name": "Autodromo Hermanos Rodriguez",
       "lat": 19.402,
       "lon": -99.091,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 21,
@@ -259,7 +279,8 @@
       "repo_name": "Autodromo Jose Carlos Pace - Interlagos",
       "lat": -23.702,
       "lon": -46.698,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 22,
@@ -271,7 +292,8 @@
       "repo_name": "Las Vegas Street Circuit",
       "lat": 36.116,
       "lon": -115.168,
-      "normalization_applied": false
+      "normalization_applied": false,
+      "lap_record": null
     },
     {
       "round": 23,
@@ -284,7 +306,8 @@
       "lat": 25.490,
       "lon": 51.454,
       "normalization_applied": true,
-      "normalization_note": "Doha from calendar mapped to Lusail location in circuits repo"
+      "normalization_note": "Doha from calendar mapped to Lusail location in circuits repo",
+      "lap_record": null
     },
     {
       "round": 24,
@@ -297,7 +320,8 @@
       "lat": 24.471,
       "lon": 54.601,
       "normalization_applied": true,
-      "normalization_note": "Yas Island from calendar mapped to Yas Marina location in circuits repo"
+      "normalization_note": "Yas Island from calendar mapped to Yas Marina location in circuits repo",
+      "lap_record": null
     }
   ]
 }
