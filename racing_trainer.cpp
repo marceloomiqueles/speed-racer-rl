@@ -408,6 +408,7 @@ int main(int argc, char* argv[]) {
 
     int MILESTONE_FREQUENCY = 50;
     std::string trackName = "sandbox";
+    bool ENABLE_RENDER = false;
     const int BATCH_SIZE = 32;
     const int REPLAY_BUFFER_SIZE = 50000;
 
@@ -430,6 +431,8 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             trackName = argv[++i];
+        } else if (arg == "--render") {
+            ENABLE_RENDER = true;
         } else if (arg == "--milestone") {
             if (i + 1 >= argc) {
                 std::cerr << "Missing value for --milestone\n";
@@ -437,8 +440,8 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>]\n";
-            std::cout << "Example: racing_trainer --milestone 50 --track sandbox\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--render]\n";
+            std::cout << "Example: racing_trainer --milestone 50 --track sandbox --render\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -467,6 +470,7 @@ int main(int argc, char* argv[]) {
                   << "' is a stub and currently uses sandbox geometry.\n";
     }
     std::cout << "Batch size: " << BATCH_SIZE << "\n";
+    std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
 
@@ -540,7 +544,16 @@ int main(int argc, char* argv[]) {
     if (!resumedFromCheckpoint) {
         std::cout << "No checkpoint found for track. Starting training from scratch.\n";
     }
-	
+
+    Texture2D trackTexture = {0};
+    Texture2D carTexture = {0};
+    if (ENABLE_RENDER) {
+        InitWindow(track.screen_width, track.screen_height, "Speed Racer - Trainer Render");
+        SetTargetFPS(60);
+        trackTexture = LoadTextureFromImage(trackImage);
+        carTexture = LoadTexture("assets/racecarTransparent.png");
+    }
+		
 float epsilon = EPSILON_START;
     TrainingStats stats;
 	
@@ -598,6 +611,11 @@ float epsilon = EPSILON_START;
         }
 
         while (!raceFinished && episode_steps < max_steps && !interrupted) {
+            if (ENABLE_RENDER && WindowShouldClose()) {
+                interrupted = 1;
+                break;
+            }
+
             Vector2 prevPosition = position;
 
             if (episode_steps % STUCK_CHECK_INTERVAL == 0 && episode_steps > 0) {
@@ -791,6 +809,49 @@ float epsilon = EPSILON_START;
                 loss_count++;
             }
 
+            if (ENABLE_RENDER) {
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
+
+                if (trackTexture.id > 0) {
+                    DrawTexture(trackTexture, 0, 0, WHITE);
+                }
+
+                for (int i = 0; i < (int)checkpoints.size(); i++) {
+                    Color cpColor = (i == 0) ? RED : YELLOW;
+                    if (checkpoints[i].crossed) cpColor = GREEN;
+                    if (i == nextCheckpoint) cpColor = BLUE;
+                    DrawLineEx(checkpoints[i].start, checkpoints[i].end, 3, cpColor);
+                }
+
+                if (carTexture.id > 0) {
+                    const float carTextureScale = 0.15f;
+                    Rectangle source = {0, 0, (float)carTexture.width, (float)carTexture.height};
+                    Rectangle dest = {
+                        position.x,
+                        position.y,
+                        carTexture.width * carTextureScale,
+                        carTexture.height * carTextureScale
+                    };
+                    Vector2 origin = {
+                        carTexture.width * carTextureScale / 2.0f,
+                        carTexture.height * carTextureScale / 2.0f
+                    };
+                    DrawTexturePro(carTexture, source, dest, origin, angle * RAD2DEG, WHITE);
+                } else {
+                    DrawCircleV(position, 8.0f, RED);
+                }
+
+                DrawText(TextFormat("Episode: %d", episode), 10, 10, 20, RED);
+                DrawText(TextFormat("Step: %d / %d", episode_steps, max_steps), 10, 32, 18, DARKGRAY);
+                DrawText(TextFormat("Lap: %d / 3", currentLap), 10, 52, 18, DARKGRAY);
+                DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
+                DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
+                DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
+                DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
+                EndDrawing();
+            }
+
             state = std::move(next_state);
             if (done) break;
         }
@@ -967,6 +1028,12 @@ float epsilon = EPSILON_START;
         std::cout << "Final model saved. Safe to exit.\n";
     }
 
+    if (ENABLE_RENDER) {
+        if (carTexture.id > 0) UnloadTexture(carTexture);
+        if (trackTexture.id > 0) UnloadTexture(trackTexture);
+        CloseWindow();
+    }
+	
     UnloadImage(trackImage);
     return 0;
 }

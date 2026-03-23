@@ -144,6 +144,12 @@ To train a new agent:
 ./racing_trainer --track sandbox
 ```
 
+To train with live visualization (slower):
+
+```bash
+./racing_trainer --track sandbox --render
+```
+
 Training runs headless and periodically saves model checkpoints.
 Checkpoints are stored per track in `build/models/<track_name>/` (for example `build/models/sandbox/best_time.pt`).
 Best-time checkpoints are also exported outside `build` to `trainedModels/<track_name>/best_time.pt`.
