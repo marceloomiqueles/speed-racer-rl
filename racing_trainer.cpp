@@ -275,11 +275,6 @@ static inline float DistToCheckpointMid(const std::vector<Checkpoint>& checkpoin
     return sqrtf(dx*dx + dy*dy);
 }
 
-static inline Vector2 CheckpointMid(const std::vector<Checkpoint>& checkpoints, int cpIndex) {
-    const Checkpoint& cp = checkpoints[cpIndex];
-    return {(cp.start.x + cp.end.x) * 0.5f, (cp.start.y + cp.end.y) * 0.5f};
-}
-
 struct EvalResult {
     int episodes = 0;
 
@@ -1038,20 +1033,9 @@ float epsilon = EPSILON_START;
         const float STUCK_DIST_THRESHOLD = 30.0f;
         const int STUCK_STRIKES_MAX = 3;
         const float STUCK_BREAK_PENALTY = 50.0f;
-        const float WRONG_WAY_PENALTY = 0.40f;
-        const float WRONG_WAY_TERMINATE_PENALTY = 180.0f;
-        const float WRONG_WAY_SPEED_MIN = 10.0f;
-        const float WRONG_WAY_DOT_THRESHOLD = -0.02f;
-        const float WRONG_WAY_PROGRESS_THRESHOLD = -0.20f;
-        const float WRONG_WAY_SCORE_ACTIVATE = 5.0f;
-        const float WRONG_WAY_SCORE_TERMINATE = 25.0f;
-        const float WRONG_WAY_SCORE_DECAY = 0.75f;
-        float wrongWayScore = 0.0f;
-        bool wrongWayActive = false;
-        bool wrongWayTerminated = false;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
             ? get_stage_params(curriculumStage)
-            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
+            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 20.0f, 2.0f, 0.010f, 50.0f, 200.0f, 500.0f, 0.0f};
 
         std::vector<float> state = GetState(trackImage, position, angle, speed);
         std::vector<TraceSample> trace;
@@ -1194,58 +1178,6 @@ float epsilon = EPSILON_START;
                 reward += fabs(speed) * DT * stageParams.speed_progress_gain;
             }
 
-            // Penalize driving against local track direction (wrong-way).
-            // Use both directional alignment and sustained negative progress
-            // to avoid false negatives in some track segments.
-            const int cpA = nextCheckpoint;
-            const int cpB = (nextCheckpoint + 1) % (int)checkpoints.size();
-            Vector2 mA = CheckpointMid(checkpoints, cpA);
-            Vector2 mB = CheckpointMid(checkpoints, cpB);
-            Vector2 trackDir = {mB.x - mA.x, mB.y - mA.y};
-            float trackDirLen = sqrtf(trackDir.x * trackDir.x + trackDir.y * trackDir.y);
-            float speedAbs = fabs(speed);
-            bool wrongWayByDirection = false;
-            if (trackDirLen > 1e-3f && speedAbs > WRONG_WAY_SPEED_MIN) {
-                trackDir.x /= trackDirLen;
-                trackDir.y /= trackDirLen;
-                Vector2 carDir = {cosf(angle), sinf(angle)};
-                if (speed < 0.0f) {
-                    carDir.x = -carDir.x;
-                    carDir.y = -carDir.y;
-                }
-                float dirDot = carDir.x * trackDir.x + carDir.y * trackDir.y;
-                wrongWayByDirection = (dirDot < WRONG_WAY_DOT_THRESHOLD);
-            }
-            bool wrongWayByProgress = (speedAbs > WRONG_WAY_SPEED_MIN &&
-                                       progress < WRONG_WAY_PROGRESS_THRESHOLD);
-
-            bool wrongWayByCheckpointFlow = false;
-            if (currentLap > 0) {
-                int prevCheckpoint = (nextCheckpoint - 1 + (int)checkpoints.size()) % (int)checkpoints.size();
-                if (prevCheckpoint != nextCheckpoint &&
-                    checkpoints[prevCheckpoint].CheckCrossing(prevPosition, position)) {
-                    wrongWayByCheckpointFlow = true;
-                }
-            }
-
-            if (wrongWayByCheckpointFlow) {
-                wrongWayScore += 8.0f;
-                reward -= 15.0f;
-            } else if (wrongWayByDirection || wrongWayByProgress) {
-                wrongWayScore += 1.0f;
-            } else {
-                wrongWayScore = std::max(0.0f, wrongWayScore - WRONG_WAY_SCORE_DECAY);
-            }
-
-            wrongWayActive = (wrongWayScore >= WRONG_WAY_SCORE_ACTIVATE);
-            if (wrongWayActive) {
-                reward -= WRONG_WAY_PENALTY * speedAbs * DT;
-                if (wrongWayScore >= WRONG_WAY_SCORE_TERMINATE) {
-                    reward -= WRONG_WAY_TERMINATE_PENALTY;
-                    wrongWayTerminated = true;
-                }
-            }
-
             if (hitWall) reward -= stageParams.wall_hit_penalty;
             if (surfaceFriction > 2.0f) reward -= stageParams.grass_penalty_rate * DT;
 
@@ -1315,7 +1247,7 @@ float epsilon = EPSILON_START;
             episode_steps++;
 
             std::vector<float> next_state = GetState(trackImage, position, angle, speed);
-            bool done = raceFinished || episode_steps >= max_steps || wrongWayTerminated;
+            bool done = raceFinished || episode_steps >= max_steps;
 
             replay_buffer.add(state, action, reward, next_state, done);
 
@@ -1380,9 +1312,6 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
-                if (wrongWayActive) {
-                    DrawText("WRONG WAY", 10, 132, 22, RED);
-                }
                 DrawControlPadTopRight(track.screen_width, action);
                 DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
