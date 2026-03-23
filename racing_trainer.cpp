@@ -70,13 +70,17 @@ static const char* ActionLabel(int action) {
     }
 }
 
-static void DrawControlTriangles(int cx, int cy, float s, float throttle, float steering) {
+static void DrawControlTriangles(int cx, int cy, float s, int action) {
     const Color outline = BLACK;
     const Color noFill = BLANK;
-    const Color forwardFill = (throttle > 0.1f) ? GREEN : noFill;
-    const Color reverseFill = (throttle < -0.1f) ? RED : noFill;
-    const Color leftFill = (steering < -0.1f) ? YELLOW : noFill;
-    const Color rightFill = (steering > 0.1f) ? YELLOW : noFill;
+    const bool forwardActive = (action == 0 || action == 4 || action == 5);
+    const bool reverseActive = (action == 1);
+    const bool leftActive = (action == 2 || action == 4);
+    const bool rightActive = (action == 3 || action == 5);
+    const Color forwardFill = forwardActive ? GREEN : noFill;
+    const Color reverseFill = reverseActive ? RED : noFill;
+    const Color leftFill = leftActive ? YELLOW : noFill;
+    const Color rightFill = rightActive ? YELLOW : noFill;
 
     Vector2 upA = {(float)cx, (float)cy - s * 1.6f};
     Vector2 upB = {(float)cx - s, (float)cy - s * 0.2f};
@@ -111,7 +115,7 @@ static void DrawControlTriangles(int cx, int cy, float s, float throttle, float 
     draw_outline(rtA, rtB, rtC);
 }
 
-static void DrawControlPadTopRight(int screenWidth, float throttle, float steering) {
+static void DrawControlPadTopRight(int screenWidth, int action) {
     const int margin = 16;
     const int boxW = 110;
     const int boxH = 110;
@@ -123,7 +127,7 @@ static void DrawControlPadTopRight(int screenWidth, float throttle, float steeri
 
     const int cx = x + boxW / 2;
     const int cy = y + boxH / 2;
-    DrawControlTriangles(cx, cy, 18.0f, throttle, steering);
+    DrawControlTriangles(cx, cy, 18.0f, action);
 }
 
 static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
@@ -1027,7 +1031,7 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
-                DrawControlPadTopRight(track.screen_width, accelerationInput, steeringInput);
+                DrawControlPadTopRight(track.screen_width, action);
                 DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
             }
