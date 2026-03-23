@@ -178,6 +178,22 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `clean` -> `pace` when finish rate and wall-hit stability are good
 - `pace` -> `corner` when finish pace improves consistently
 
+Optional top-speed reward (off by default):
+
+```bash
+./racing_trainer --track sandbox --reward-top-speed
+```
+
+Recommended safe start values:
+
+```bash
+./racing_trainer --track sandbox --reward-top-speed \
+  --reward-top-speed-gain 0.003 \
+  --reward-top-speed-peak-bonus 0.30
+```
+
+Top-speed reward is only applied when there is forward checkpoint progress and no wall hit on that step.
+
 ### Episode Budget and Evaluation
 
 Recommended episode budgets (practical ranges):
@@ -250,7 +266,7 @@ Track definitions are centralized in `track_config.h` (name, image path, spawn, 
 
 - Default track: `sandbox`
 - Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
-- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--render-lidar] [--reset-training]`
+- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--render-lidar] [--reward-top-speed] [--reward-top-speed-gain <float>] [--reward-top-speed-peak-bonus <float>] [--reset-training]`
 
 F1 tracks are generated from `f1-circuits.geojson` with:
 

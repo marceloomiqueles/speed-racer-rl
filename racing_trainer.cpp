@@ -626,6 +626,7 @@ int main(int argc, char* argv[]) {
     bool ENABLE_RENDER = false;
     bool ENABLE_RENDER_TRACE = false;
     bool ENABLE_RENDER_LIDAR = false;
+    bool ENABLE_TOP_SPEED_REWARD = false;
     bool RESET_TRAINING = false;
     const int BATCH_SIZE = 32;
     const int REPLAY_BUFFER_SIZE = 50000;
@@ -637,6 +638,8 @@ int main(int argc, char* argv[]) {
     float EPSILON_END = 0.005f;
     float EPSILON_DECAY = 0.995f;
     int WARMUP_EPISODES = 5;
+    float TOP_SPEED_REWARD_GAIN = 0.0030f;
+    float TOP_SPEED_PEAK_BONUS = 0.3000f;
 
     const int TRAIN_EVERY_N_STEPS = 3;
     const int max_steps = 7500;
@@ -700,6 +703,20 @@ int main(int argc, char* argv[]) {
             ENABLE_RENDER_TRACE = true;
         } else if (arg == "--render-lidar") {
             ENABLE_RENDER_LIDAR = true;
+        } else if (arg == "--reward-top-speed") {
+            ENABLE_TOP_SPEED_REWARD = true;
+        } else if (arg == "--reward-top-speed-gain") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --reward-top-speed-gain\n";
+                return 1;
+            }
+            TOP_SPEED_REWARD_GAIN = std::stof(argv[++i]);
+        } else if (arg == "--reward-top-speed-peak-bonus") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --reward-top-speed-peak-bonus\n";
+                return 1;
+            }
+            TOP_SPEED_PEAK_BONUS = std::stof(argv[++i]);
         } else if (arg == "--reset-training") {
             RESET_TRAINING = true;
         } else if (arg == "--milestone") {
@@ -709,10 +726,11 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--render-lidar] [--reset-training]\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--render-lidar] [--reward-top-speed] [--reward-top-speed-gain <float>] [--reward-top-speed-peak-bonus <float>] [--reset-training]\n";
             std::cout << "Example (base): racing_trainer --track sandbox --profile base --render\n";
             std::cout << "Example (finetune): racing_trainer --track australian-gp --profile finetune --init-model ../trainedModels/base/best.pt\n";
             std::cout << "Example (curriculum): racing_trainer --track sandbox --profile base --curriculum auto\n";
+            std::cout << "Example (top-speed reward): racing_trainer --track sandbox --reward-top-speed --reward-top-speed-gain 0.003 --reward-top-speed-peak-bonus 0.30\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -820,6 +838,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
     std::cout << "Render trace: " << ((ENABLE_RENDER && ENABLE_RENDER_TRACE) ? "on" : "off") << "\n";
     std::cout << "Render lidar: " << ((ENABLE_RENDER && ENABLE_RENDER_LIDAR) ? "on" : "off") << "\n";
+    std::cout << "Top-speed reward: " << (ENABLE_TOP_SPEED_REWARD ? "on" : "off")
+              << " (gain=" << std::fixed << std::setprecision(4) << TOP_SPEED_REWARD_GAIN
+              << ", peak_bonus=" << TOP_SPEED_PEAK_BONUS << ")\n";
     std::cout << "Reset training: " << (RESET_TRAINING ? "yes" : "no") << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
@@ -869,6 +890,7 @@ int main(int argc, char* argv[]) {
     if (aiRecords.count(track.name) && aiRecords[track.name].time_seconds < 1e17) {
         aiRecordText = "AI Record: " + aiRecords[track.name].time_text + " (" + aiRecords[track.name].model + ")";
     }
+    float lastEpisodeTopSpeed = 0.0f;
 
     std::error_code ec;
     if (RESET_TRAINING) {
@@ -1126,6 +1148,7 @@ float epsilon = EPSILON_START;
         int episode_steps = 0;
         float total_loss = 0.0f;
         int loss_count = 0;
+        float episodeTopSpeed = 0.0f;
 
         int stuckCounter = 0;
         Vector2 lastCheckPosition = position;
@@ -1319,6 +1342,16 @@ float epsilon = EPSILON_START;
             if (progress > 0.0f){
                 reward += fabs(speed) * DT * stageParams.speed_progress_gain;
             }
+            if (ENABLE_TOP_SPEED_REWARD && progress > 0.0f && !hitWall) {
+                float absSpeed = fabs(speed);
+                reward += absSpeed * DT * TOP_SPEED_REWARD_GAIN;
+                if (absSpeed > episodeTopSpeed + 1.0f) {
+                    reward += TOP_SPEED_PEAK_BONUS;
+                }
+            }
+            if (fabs(speed) > episodeTopSpeed) {
+                episodeTopSpeed = fabs(speed);
+            }
 
             if (hitWall) reward -= stageParams.wall_hit_penalty;
             if (surfaceFriction > 2.0f) reward -= stageParams.grass_penalty_rate * DT;
@@ -1508,7 +1541,8 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
-                DrawText(aiRecordText.c_str(), 10, 132, 18, DARKGREEN);
+                DrawText(TextFormat("TopSpeed: %.1f", episodeTopSpeed), 10, 132, 18, DARKGRAY);
+                DrawText(aiRecordText.c_str(), 10, 152, 18, DARKGREEN);
                 DrawControlPadTopRight(track.screen_width, action);
                 DrawText("Trainer Render Mode (L: lidar, ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
@@ -1525,6 +1559,7 @@ float epsilon = EPSILON_START;
         stats.episode_losses.push_back(loss_count > 0 ? total_loss / loss_count : 0.0f);
         stats.episode_laps.push_back(currentLap);
         stats.episode_finishes.push_back(raceFinished ? 1 : 0);
+        lastEpisodeTopSpeed = episodeTopSpeed;
 
         if (curriculumMode == CurriculumMode::Off && raceFinished && !lr_dropped_once) {
             dqn.set_learning_rate(3e-4f);
@@ -1563,6 +1598,7 @@ float epsilon = EPSILON_START;
                         << " | Laps: " << currentLap
                         << " | ε: " << std::setprecision(3) << epsilon
                         << " | Steps: " << episode_steps
+                        << " | TopSpeed: " << std::fixed << std::setprecision(1) << lastEpisodeTopSpeed
                         << " | LR: " << std::scientific << dqn.get_learning_rate()
                         << " | Stage: " << ((curriculumMode == CurriculumMode::Auto) ? stage_to_string(curriculumStage) : "manual")
                         << " | Time: " << std::fixed << duration.count() << "s"
