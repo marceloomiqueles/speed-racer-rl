@@ -1,2 +1,2 @@
-track_slug,time_seconds,time_text,model,updated_at_utc,source
-sandbox,12.250,0:12.250,base_training,2026-03-23T23:06:30Z,ai_training
+track_slug,time_seconds,time_text,model,updated_at_utc,source,clean_lap
+sandbox,12.250,0:12.250,base_training,2026-03-23T23:06:30Z,ai_training,false

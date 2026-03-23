@@ -136,7 +136,8 @@ Or use auto mode (loads `models/<track>/best_time.pt` and falls back to `../trai
 
 Replay runs in real time and renders the environment, vehicle, and perception rays.
 When replay sets a better AI lap time for a track, it updates `tracks_ai_records.csv`
-with the best `time_seconds`, formatted time, model name, and UTC timestamp.
+with the best `time_seconds`, formatted time, model name, UTC timestamp, and
+`clean_lap` (`true` if that lap had no wall hits).
 
 ## Training
 
@@ -223,7 +224,8 @@ To render LIDAR rays in trainer:
 
 In render mode, press `L` to toggle LIDAR visibility.
 Trainer HUD also shows the current AI lap record for the selected track and updates
-`tracks_ai_records.csv` when a better lap is achieved during training.
+`tracks_ai_records.csv` when a better lap is achieved during training, including
+the `clean_lap` field.
 
 To reset a track training run (checkpoints + scheduler state) and restart from episode 1:
 
