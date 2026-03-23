@@ -16,9 +16,14 @@
       "repo_id": "au-1953",
       "repo_name": "Albert Park Circuit",
       "lat": -37.846,
-      "lon": 144.970,
+      "lon": 144.97,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:19.813",
+        "driver": "Charles Leclerc",
+        "year": 2024,
+        "source": "https://en.wikipedia.org/wiki/Albert_Park_Circuit"
+      }
     },
     {
       "round": 2,
@@ -28,10 +33,15 @@
       "normalized_location": "Shanghai",
       "repo_id": "cn-2004",
       "repo_name": "Shanghai International Circuit",
-      "lat": 31.340,
+      "lat": 31.34,
       "lon": 121.221,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:32.238",
+        "driver": "Michael Schumacher",
+        "year": 2004,
+        "source": "https://en.wikipedia.org/wiki/Shanghai_International_Circuit"
+      }
     },
     {
       "round": 3,
@@ -44,7 +54,12 @@
       "lat": 34.844,
       "lon": 136.534,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:30.965",
+        "driver": "Andrea Kimi Antonelli",
+        "year": 2025,
+        "source": "https://en.wikipedia.org/wiki/Suzuka_Circuit"
+      }
     },
     {
       "round": 4,
@@ -57,7 +72,12 @@
       "lat": 26.031,
       "lon": 50.512,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:31.447",
+        "driver": "Pedro de la Rosa",
+        "year": 2005,
+        "source": "https://en.wikipedia.org/wiki/Bahrain_International_Circuit"
+      }
     },
     {
       "round": 5,
@@ -70,7 +90,12 @@
       "lat": 21.632,
       "lon": 39.104,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:30.734",
+        "driver": "Lewis Hamilton",
+        "year": 2021,
+        "source": "https://en.wikipedia.org/wiki/Jeddah_Corniche_Circuit"
+      }
     },
     {
       "round": 6,
@@ -83,7 +108,12 @@
       "lat": 25.958,
       "lon": -80.239,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:29.708",
+        "driver": "Max Verstappen",
+        "year": 2023,
+        "source": "https://en.wikipedia.org/wiki/Miami_International_Autodrome"
+      }
     },
     {
       "round": 7,
@@ -96,7 +126,12 @@
       "lat": 45.506,
       "lon": -73.525,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:13.078",
+        "driver": "Valtteri Bottas",
+        "year": 2019,
+        "source": "https://en.wikipedia.org/wiki/Circuit_Gilles_Villeneuve"
+      }
     },
     {
       "round": 8,
@@ -110,7 +145,12 @@
       "lon": 7.429,
       "normalization_applied": true,
       "normalization_note": "Monte Carlo from calendar mapped to Monaco in circuits repo",
-      "lap_record": null
+      "lap_record": {
+        "time": "1:12.909",
+        "driver": "Lewis Hamilton",
+        "year": 2021,
+        "source": "https://en.wikipedia.org/wiki/Circuit_de_Monaco"
+      }
     },
     {
       "round": 9,
@@ -123,7 +163,12 @@
       "lat": 41.569,
       "lon": 2.259,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:15.743",
+        "driver": "Oscar Piastri",
+        "year": 2025,
+        "source": "https://en.wikipedia.org/wiki/Circuit_de_Barcelona-Catalunya"
+      }
     },
     {
       "round": 10,
@@ -136,7 +181,12 @@
       "lat": 47.223,
       "lon": 14.761,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:07.924",
+        "driver": "Oscar Piastri",
+        "year": 2025,
+        "source": "https://en.wikipedia.org/wiki/Red_Bull_Ring"
+      }
     },
     {
       "round": 11,
@@ -149,7 +199,12 @@
       "lat": 52.072,
       "lon": -1.017,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:27.097",
+        "driver": "Max Verstappen",
+        "year": 2020,
+        "source": "https://en.wikipedia.org/wiki/Silverstone_Circuit"
+      }
     },
     {
       "round": 12,
@@ -162,7 +217,12 @@
       "lat": 50.436,
       "lon": 5.971,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:44.701",
+        "driver": "Sergio Pérez",
+        "year": 2024,
+        "source": "https://en.wikipedia.org/wiki/Circuit_de_Spa-Francorchamps"
+      }
     },
     {
       "round": 13,
@@ -173,9 +233,14 @@
       "repo_id": "hu-1986",
       "repo_name": "Hungaroring",
       "lat": 47.583,
-      "lon": 19.250,
+      "lon": 19.25,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:16.627",
+        "driver": "Lewis Hamilton",
+        "year": 2020,
+        "source": "https://en.wikipedia.org/wiki/Hungaroring"
+      }
     },
     {
       "round": 14,
@@ -188,7 +253,12 @@
       "lat": 52.389,
       "lon": 4.541,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:11.097",
+        "driver": "Lewis Hamilton",
+        "year": 2021,
+        "source": "https://en.wikipedia.org/wiki/Circuit_Zandvoort"
+      }
     },
     {
       "round": 15,
@@ -199,9 +269,14 @@
       "repo_id": "it-1922",
       "repo_name": "Autodromo Nazionale Monza",
       "lat": 45.621,
-      "lon": 9.290,
+      "lon": 9.29,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:20.901",
+        "driver": "257.781 km/h (160.178 mph",
+        "year": 2025,
+        "source": "https://en.wikipedia.org/wiki/Monza_Circuit"
+      }
     },
     {
       "round": 16,
@@ -212,9 +287,15 @@
       "repo_id": "es-2026",
       "repo_name": "Circuito de Madring",
       "lat": 40.471,
-      "lon": -3.620,
+      "lon": -3.62,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": null,
+        "driver": null,
+        "year": null,
+        "source": "https://en.wikipedia.org/wiki/Madring",
+        "note": "Lap record not available or not parseable from source"
+      }
     },
     {
       "round": 17,
@@ -227,7 +308,12 @@
       "lat": 40.369,
       "lon": 49.842,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:43.009",
+        "driver": "Charles Leclerc",
+        "year": 2019,
+        "source": "https://en.wikipedia.org/wiki/Baku_City_Circuit"
+      }
     },
     {
       "round": 18,
@@ -241,7 +327,12 @@
       "lon": 103.859,
       "normalization_applied": true,
       "normalization_note": "Marina Bay from calendar mapped to Singapore location in circuits repo",
-      "lap_record": null
+      "lap_record": {
+        "time": "1:33.808",
+        "driver": "Lewis Hamilton",
+        "year": 2025,
+        "source": "https://en.wikipedia.org/wiki/Marina_Bay_Street_Circuit"
+      }
     },
     {
       "round": 19,
@@ -254,7 +345,12 @@
       "lat": 30.135,
       "lon": -97.633,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:36.169",
+        "driver": "Charles Leclerc",
+        "year": 2019,
+        "source": "https://en.wikipedia.org/wiki/Circuit_of_the_Americas"
+      }
     },
     {
       "round": 20,
@@ -267,7 +363,12 @@
       "lat": 19.402,
       "lon": -99.091,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:17.774",
+        "driver": "Valtteri Bottas",
+        "year": 2021,
+        "source": "https://en.wikipedia.org/wiki/Aut%C3%B3dromo_Hermanos_Rodr%C3%ADguez"
+      }
     },
     {
       "round": 21,
@@ -280,7 +381,12 @@
       "lat": -23.702,
       "lon": -46.698,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:10.540",
+        "driver": "Valtteri Bottas",
+        "year": 2018,
+        "source": "https://en.wikipedia.org/wiki/Interlagos_Circuit"
+      }
     },
     {
       "round": 22,
@@ -293,7 +399,12 @@
       "lat": 36.116,
       "lon": -115.168,
       "normalization_applied": false,
-      "lap_record": null
+      "lap_record": {
+        "time": "1:33.365",
+        "driver": "Max Verstappen",
+        "year": 2025,
+        "source": "https://en.wikipedia.org/wiki/Las_Vegas_Strip_Circuit"
+      }
     },
     {
       "round": 23,
@@ -303,11 +414,16 @@
       "normalized_location": "Lusail",
       "repo_id": "qa-2004",
       "repo_name": "Losail International Circuit",
-      "lat": 25.490,
+      "lat": 25.49,
       "lon": 51.454,
       "normalization_applied": true,
       "normalization_note": "Doha from calendar mapped to Lusail location in circuits repo",
-      "lap_record": null
+      "lap_record": {
+        "time": "1:22.384",
+        "driver": "Lando Norris",
+        "year": 2024,
+        "source": "https://en.wikipedia.org/wiki/Lusail_International_Circuit"
+      }
     },
     {
       "round": 24,
@@ -321,7 +437,12 @@
       "lon": 54.601,
       "normalization_applied": true,
       "normalization_note": "Yas Island from calendar mapped to Yas Marina location in circuits repo",
-      "lap_record": null
+      "lap_record": {
+        "time": "1:25.637",
+        "driver": "Kevin Magnussen",
+        "year": 2024,
+        "source": "https://en.wikipedia.org/wiki/Yas_Marina_Circuit"
+      }
     }
   ]
 }
