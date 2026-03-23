@@ -128,6 +128,12 @@ To visualize a file from `sampleModels/`:
 ./racing_replay sampleModels/best_time.pt --track sandbox
 ```
 
+Or use auto mode (loads `models/<track>/best_time.pt`):
+
+```bash
+./racing_replay --track sandbox
+```
+
 Replay runs in real time and renders the environment, vehicle, and perception rays.
 
 ## Training

@@ -180,8 +180,9 @@ int main(int argc, char* argv[]) {
             }
             trackName = argv[++i];
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_replay <model_path> [--track <track_name>]\n";
+            std::cout << "Usage: racing_replay [model_path] [--track <track_name>]\n";
             std::cout << "Example: racing_replay models/model_episode_450.pt --track sandbox\n";
+            std::cout << "Auto mode: racing_replay --track sandbox\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -192,12 +193,6 @@ int main(int argc, char* argv[]) {
             std::cerr << "Unexpected argument: " << arg << "\n";
             return 1;
         }
-    }
-
-    if (modelPath.empty()) {
-        std::cout << "Usage: racing_replay <model_path> [--track <track_name>]\n";
-        std::cout << "Example: racing_replay models/model_episode_450.pt --track sandbox\n";
-        return 1;
     }
 
     TrackConfig track;
@@ -212,6 +207,10 @@ int main(int argc, char* argv[]) {
     }
 
     namespace fs = std::filesystem;
+    if (modelPath.empty()) {
+        modelPath = (fs::path("models") / track.name / "best_time.pt").string();
+        std::cout << "Auto model path: " << modelPath << "\n";
+    }
 
     if (!fs::exists(modelPath)) {
         std::cerr << "Model file not found: " << modelPath << "\n";
@@ -238,7 +237,8 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        std::cerr << "Tip: from build/, try: ./racing_replay ../sampleModels/best_time.pt\n";
+        std::cerr << "Tip: from build/, train first with ./racing_trainer --track " << track.name << "\n";
+        std::cerr << "Tip: or run replay with explicit model path, e.g. ./racing_replay ../sampleModels/best_time.pt\n";
         return 1;
     }
 
