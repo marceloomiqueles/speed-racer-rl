@@ -498,7 +498,6 @@ int main(int argc, char* argv[]) {
     fs::path modelsRoot = "models";
     fs::path trackModelDir = modelsRoot / track.name;
     fs::path trackBestTimePath = trackModelDir / "best_time.pt";
-    fs::path legacyBestTimePath = modelsRoot / "best_time.pt";
 
     std::error_code ec;
     fs::create_directories(trackModelDir, ec);
@@ -511,16 +510,11 @@ int main(int argc, char* argv[]) {
 
     bool resumedFromCheckpoint = false;
     try {
-        if (fs::exists(trackBestTimePath)) {
+        if (fs::is_regular_file(trackBestTimePath)) {
             dqn.load_model(trackBestTimePath.string());
             dqn.set_learning_rate(1e-4f);
             resumedFromCheckpoint = true;
             std::cout << "Resumed from: " << trackBestTimePath.string() << "\n";
-        } else if (fs::exists(legacyBestTimePath)) {
-            dqn.load_model(legacyBestTimePath.string());
-            dqn.set_learning_rate(1e-4f);
-            resumedFromCheckpoint = true;
-            std::cout << "Resumed from legacy checkpoint: " << legacyBestTimePath.string() << "\n";
         }
     } catch (const std::exception& e) {
         std::cerr << "Failed to load checkpoint: " << e.what() << "\n";
