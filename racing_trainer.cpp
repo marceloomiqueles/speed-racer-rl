@@ -172,6 +172,7 @@ struct AiLapRecord {
     std::string model;
     std::string updated_at_utc;
     std::string source;
+    bool clean_lap = false;
 };
 
 static std::string FormatLapSeconds(double sec) {
@@ -213,13 +214,14 @@ static std::unordered_map<std::string, AiLapRecord> LoadAiLapRecords(const std::
         if (line.empty() || line[0] == '#') continue;
         if (line.rfind("track_slug,", 0) == 0) continue;
         std::stringstream ss(line);
-        std::string slug, sec, timeText, model, updated, source;
+        std::string slug, sec, timeText, model, updated, source, cleanLap;
         if (!std::getline(ss, slug, ',')) continue;
         if (!std::getline(ss, sec, ',')) continue;
         if (!std::getline(ss, timeText, ',')) continue;
         if (!std::getline(ss, model, ',')) continue;
         if (!std::getline(ss, updated, ',')) continue;
-        std::getline(ss, source);
+        std::getline(ss, source, ',');
+        std::getline(ss, cleanLap);
         try {
             AiLapRecord rec;
             rec.time_seconds = std::stod(sec);
@@ -227,6 +229,7 @@ static std::unordered_map<std::string, AiLapRecord> LoadAiLapRecords(const std::
             rec.model = model;
             rec.updated_at_utc = updated;
             rec.source = source;
+            rec.clean_lap = (cleanLap == "true" || cleanLap == "1");
             out[slug] = rec;
         } catch (...) {
         }
@@ -244,7 +247,7 @@ static bool SaveAiLapRecords(const std::filesystem::path& path,
     std::ofstream out(path, std::ios::trunc);
     if (!out.is_open()) return false;
 
-    out << "track_slug,time_seconds,time_text,model,updated_at_utc,source\n";
+    out << "track_slug,time_seconds,time_text,model,updated_at_utc,source,clean_lap\n";
     std::vector<std::string> keys;
     keys.reserve(records.size());
     for (const auto& kv : records) keys.push_back(kv.first);
@@ -256,7 +259,8 @@ static bool SaveAiLapRecords(const std::filesystem::path& path,
             << r.time_text << ","
             << r.model << ","
             << r.updated_at_utc << ","
-            << r.source << "\n";
+            << r.source << ","
+            << (r.clean_lap ? "true" : "false") << "\n";
     }
     return true;
 }
@@ -1365,6 +1369,7 @@ float epsilon = EPSILON_START;
                                 rec.model = profileStorageKey + "_training";
                                 rec.updated_at_utc = NowUtcIso8601();
                                 rec.source = "ai_training";
+                                rec.clean_lap = (wallHitsThisLap == 0);
                                 aiRecords[track.name] = rec;
                                 aiRecordText = "AI Record: " + rec.time_text + " (" + rec.model + ")";
                                 if (SaveAiLapRecords(aiRecordsPath, aiRecords)) {
