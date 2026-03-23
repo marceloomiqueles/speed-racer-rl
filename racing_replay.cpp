@@ -251,6 +251,7 @@ int main(int argc, char* argv[]) {
     std::cout << "=== Racing DQN Replay ===\n";
     std::cout << "Loading model: " << modelPath << std::endl;
     std::cout << "Track: " << track.name << std::endl;
+    std::cout << "Car scale: " << track.car_scale << std::endl;
     if (track.is_stub) {
         std::cout << "WARNING: track '" << track.name
                   << "' is a stub and currently uses sandbox geometry.\n";
@@ -528,7 +529,7 @@ int main(int argc, char* argv[]) {
                 DrawText("Press SPACE to restart", screenWidth/2 - 100, screenHeight/2 + 40, 20, WHITE);
             }
 
-            float carTextureScale = 0.10f;
+            float carTextureScale = track.car_scale;
             Rectangle source = {0, 0, (float)carTexture.width, (float)carTexture.height};
             Rectangle dest = { position.x, position.y, carTexture.width * carTextureScale, carTexture.height * carTextureScale };
             Vector2 origin = { carTexture.width * carTextureScale / 2.0f, carTexture.height * carTextureScale / 2.0f };

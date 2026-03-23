@@ -2,7 +2,11 @@
 
 #include "raylib.h"
 
+#include <cctype>
+#include <fstream>
+#include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct TrackCheckpoint {
@@ -22,8 +26,66 @@ struct TrackConfig {
     int screen_height;
     Vector2 spawn_position;
     float spawn_angle;
+    float car_scale;
     std::vector<TrackCheckpoint> checkpoints;
 };
+
+inline std::string TrimTrackConfigString(const std::string& s) {
+    size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) start++;
+    size_t end = s.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) end--;
+    return s.substr(start, end - start);
+}
+
+inline std::unordered_map<std::string, float> LoadCarScaleOverrides() {
+    std::unordered_map<std::string, float> out;
+    const std::vector<std::string> candidates = {
+        "track_overrides.csv",
+        "../track_overrides.csv"
+    };
+
+    std::ifstream file;
+    for (const auto& path : candidates) {
+        file.open(path);
+        if (file.is_open()) break;
+        file.clear();
+    }
+
+    if (!file.is_open()) return out;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::string trimmed = TrimTrackConfigString(line);
+        if (trimmed.empty() || trimmed[0] == '#') continue;
+
+        std::stringstream ss(trimmed);
+        std::string name;
+        std::string value;
+        if (!std::getline(ss, name, ',')) continue;
+        if (!std::getline(ss, value)) continue;
+
+        name = TrimTrackConfigString(name);
+        value = TrimTrackConfigString(value);
+        if (name.empty() || value.empty()) continue;
+
+        try {
+            float scale = std::stof(value);
+            if (scale > 0.0f) out[name] = scale;
+        } catch (...) {
+        }
+    }
+
+    return out;
+}
+
+inline void ApplyTrackRuntimeOverrides(TrackConfig& track) {
+    static const std::unordered_map<std::string, float> carScaleOverrides = LoadCarScaleOverrides();
+    auto it = carScaleOverrides.find(track.name);
+    if (it != carScaleOverrides.end()) {
+        track.car_scale = it->second;
+    }
+}
 
 inline std::vector<TrackCheckpoint> SandboxCheckpoints() {
     return {
@@ -51,6 +113,7 @@ inline TrackConfig BuildSandboxTrack() {
     t.screen_height = 900;
     t.spawn_position = {430.0f, 92.0f};
     t.spawn_angle = 0.0f;
+    t.car_scale = 0.10f;
     t.checkpoints = SandboxCheckpoints();
     return t;
 }
@@ -126,6 +189,7 @@ inline bool LoadTrackConfig(const std::string& trackName, TrackConfig& outConfig
     for (const auto& track : GetTrackCatalog()) {
         if (track.name == trackName) {
             outConfig = track;
+            ApplyTrackRuntimeOverrides(outConfig);
             return true;
         }
     }

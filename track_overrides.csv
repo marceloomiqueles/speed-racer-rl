@@ -1,0 +1,32 @@
+# Runtime track overrides (no recompilation needed).
+# Format: <track_name>,<car_scale>
+# Example values:
+# - 0.10 default
+# - smaller car: 0.08
+# - bigger car: 0.12
+
+sandbox,0.100
+abu-dhabi-gp,0.100
+australian-gp,0.100
+austrian-gp,0.111
+azerbaijan-gp,0.094
+bahrain-gp,0.099
+belgian-gp,0.087
+british-gp,0.095
+canadian-gp,0.110
+chinese-gp,0.098
+dutch-gp,0.111
+hungarian-gp,0.110
+italian-gp,0.095
+japanese-gp,0.095
+las-vegas-gp,0.092
+mexico-city-gp,0.111
+miami-gp,0.099
+monaco-gp,0.125
+qatar-gp,0.099
+sao-paulo-gp,0.111
+saudi-arabian-gp,0.092
+singapore-gp,0.103
+spanish-gp,0.106
+spanish-gp-madrid,0.098
+united-states-gp,0.098

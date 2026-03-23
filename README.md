@@ -171,6 +171,7 @@ Training runs headless and periodically saves model checkpoints.
 Checkpoints are stored per track in `build/models/<track_name>/` (for example `build/models/sandbox/best_time.pt`).
 Best-time checkpoints are also exported outside `build` to `trainedModels/<track_name>/best_time.pt`.
 Training scheduler state (`episode_next`, `epsilon`, learning-rate schedule) is saved in `build/models/<track_name>/training_state.txt`.
+Per-track runtime overrides can be set in `track_overrides.csv` (for example `australian-gp,0.08` to shrink the car sprite on that track) without recompiling.
 
 Exact behavior (episode length, epsilon schedule, learning rate, etc.) is defined in code and can be adjusted in `racing_trainer.cpp`.
 

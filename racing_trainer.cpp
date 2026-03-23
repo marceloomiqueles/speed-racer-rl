@@ -571,6 +571,7 @@ int main(int argc, char* argv[]) {
     std::cout << "=== Racing DQN Training (CPU Optimized) ===\n";
     std::cout << "Milestone frequency: " << MILESTONE_FREQUENCY << " episodes\n";
     std::cout << "Track: " << track.name << "\n";
+    std::cout << "Car scale: " << std::fixed << std::setprecision(3) << track.car_scale << "\n";
     if (track.is_stub) {
         std::cout << "WARNING: track '" << track.name
                   << "' is a stub and currently uses sandbox geometry.\n";
@@ -1060,7 +1061,7 @@ float epsilon = EPSILON_START;
                 }
 
                 if (carTexture.id > 0) {
-                    const float carTextureScale = 0.10f;
+                    const float carTextureScale = track.car_scale;
                     Rectangle source = {0, 0, (float)carTexture.width, (float)carTexture.height};
                     Rectangle dest = {
                         position.x,
