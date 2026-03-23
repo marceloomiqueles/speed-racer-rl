@@ -150,6 +150,17 @@ To train with live visualization (slower):
 ./racing_trainer --track sandbox --render
 ```
 
+To train with live visualization and short trajectory trace overlay (last ~100 steps):
+
+```bash
+./racing_trainer --track sandbox --render --render-trace
+```
+
+Trace colors:
+- blue: normal driving
+- orange: grass frames
+- red: wall-hit frames
+
 To reset a track training run (checkpoints + scheduler state) and restart from episode 1:
 
 ```bash
@@ -169,7 +180,7 @@ Track definitions are centralized in `track_config.h` (name, image path, spawn, 
 
 - Default track: `sandbox`
 - Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
-- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>]`
+- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--render] [--render-trace] [--reset-training]`
 
 F1 tracks are generated from `f1-circuits.geojson` with:
 

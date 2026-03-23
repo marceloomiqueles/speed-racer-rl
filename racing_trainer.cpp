@@ -130,6 +130,31 @@ static void DrawControlPadTopRight(int screenWidth, int action) {
     DrawControlTriangles(cx, cy, 18.0f, action);
 }
 
+enum class TraceState : unsigned char {
+    Normal = 0,
+    Grass = 1,
+    WallHit = 2
+};
+
+struct TraceSample {
+    Vector2 pos;
+    TraceState state;
+};
+
+static void DrawRecentTrace(const std::vector<TraceSample>& trace) {
+    if (trace.size() < 2) return;
+
+    for (size_t i = 1; i < trace.size(); i++) {
+        Color c = ColorAlpha(SKYBLUE, 0.35f);
+        if (trace[i].state == TraceState::Grass) {
+            c = ColorAlpha(ORANGE, 0.45f);
+        } else if (trace[i].state == TraceState::WallHit) {
+            c = ColorAlpha(RED, 0.60f);
+        }
+        DrawLineEx(trace[i - 1].pos, trace[i].pos, 2.0f, c);
+    }
+}
+
 static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
     std::vector<Checkpoint> checkpoints;
     checkpoints.reserve(track.checkpoints.size());
@@ -484,6 +509,7 @@ int main(int argc, char* argv[]) {
     int MILESTONE_FREQUENCY = 50;
     std::string trackName = "sandbox";
     bool ENABLE_RENDER = false;
+    bool ENABLE_RENDER_TRACE = false;
     bool RESET_TRAINING = false;
     const int BATCH_SIZE = 32;
     const int REPLAY_BUFFER_SIZE = 50000;
@@ -509,6 +535,8 @@ int main(int argc, char* argv[]) {
             trackName = argv[++i];
         } else if (arg == "--render") {
             ENABLE_RENDER = true;
+        } else if (arg == "--render-trace") {
+            ENABLE_RENDER_TRACE = true;
         } else if (arg == "--reset-training") {
             RESET_TRAINING = true;
         } else if (arg == "--milestone") {
@@ -518,8 +546,8 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--render] [--reset-training]\n";
-            std::cout << "Example: racing_trainer --milestone 50 --track sandbox --render --reset-training\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--render] [--render-trace] [--reset-training]\n";
+            std::cout << "Example: racing_trainer --milestone 50 --track sandbox --render --render-trace --reset-training\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -549,6 +577,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "Batch size: " << BATCH_SIZE << "\n";
     std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
+    std::cout << "Render trace: " << ((ENABLE_RENDER && ENABLE_RENDER_TRACE) ? "on" : "off") << "\n";
     std::cout << "Reset training: " << (RESET_TRAINING ? "yes" : "no") << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
@@ -562,6 +591,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<Checkpoint> checkpointsTemplate = BuildCheckpoints(track);
+    const size_t TRACE_MAX_POINTS = 100;
 
     const float MAX_SPEED = 300.0f;
     const float ACCELERATION = 150.0f;
@@ -786,6 +816,11 @@ float epsilon = EPSILON_START;
         const float STUCK_BREAK_PENALTY = 50.0f;
 
         std::vector<float> state = GetState(trackImage, position, angle, speed);
+        std::vector<TraceSample> trace;
+        if (ENABLE_RENDER && ENABLE_RENDER_TRACE) {
+            trace.reserve(TRACE_MAX_POINTS);
+            trace.push_back({position, TraceState::Normal});
+        }
         if ((int)state.size() != STATE_SIZE) {
             std::cerr << "STATE SIZE MISMATCH at init: got=" << state.size()
                       << " expected=" << STATE_SIZE << "\n";
@@ -897,6 +932,19 @@ float epsilon = EPSILON_START;
                 speed *= -0.3f;
             }
 
+            if (ENABLE_RENDER && ENABLE_RENDER_TRACE) {
+                TraceState traceState = TraceState::Normal;
+                if (hitWall) {
+                    traceState = TraceState::WallHit;
+                } else if (surfaceFriction > 2.0f) {
+                    traceState = TraceState::Grass;
+                }
+                trace.push_back({position, traceState});
+                if (trace.size() > TRACE_MAX_POINTS) {
+                    trace.erase(trace.begin());
+                }
+            }
+
             float reward = 0.0f;
 
             float distToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, position);
@@ -998,6 +1046,10 @@ float epsilon = EPSILON_START;
 
                 if (trackTexture.id > 0) {
                     DrawTexture(trackTexture, 0, 0, WHITE);
+                }
+
+                if (ENABLE_RENDER_TRACE) {
+                    DrawRecentTrace(trace);
                 }
 
                 for (int i = 0; i < (int)checkpoints.size(); i++) {
