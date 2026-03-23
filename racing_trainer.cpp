@@ -70,17 +70,45 @@ static const char* ActionLabel(int action) {
     }
 }
 
-static Color ActionColor(int action) {
-    switch (action) {
-        case 0: return GREEN;   // forward
-        case 1: return RED;     // reverse
-        case 2: return YELLOW;  // left
-        case 3: return YELLOW;  // right
-        case 4: return YELLOW;  // forward+left
-        case 5: return YELLOW;  // forward+right
-        case 6: return LIGHTGRAY;
-        default: return WHITE;
-    }
+static void DrawControlTriangles(int cx, int cy, float s, float throttle, float steering) {
+    const Color outline = BLACK;
+    const Color noFill = BLANK;
+    const Color forwardFill = (throttle > 0.1f) ? GREEN : noFill;
+    const Color reverseFill = (throttle < -0.1f) ? RED : noFill;
+    const Color leftFill = (steering < -0.1f) ? YELLOW : noFill;
+    const Color rightFill = (steering > 0.1f) ? YELLOW : noFill;
+
+    Vector2 upA = {(float)cx, (float)cy - s * 1.6f};
+    Vector2 upB = {(float)cx - s, (float)cy - s * 0.2f};
+    Vector2 upC = {(float)cx + s, (float)cy - s * 0.2f};
+
+    Vector2 dnA = {(float)cx, (float)cy + s * 1.6f};
+    Vector2 dnB = {(float)cx - s, (float)cy + s * 0.2f};
+    Vector2 dnC = {(float)cx + s, (float)cy + s * 0.2f};
+
+    Vector2 ltA = {(float)cx - s * 1.6f, (float)cy};
+    Vector2 ltB = {(float)cx - s * 0.2f, (float)cy - s};
+    Vector2 ltC = {(float)cx - s * 0.2f, (float)cy + s};
+
+    Vector2 rtA = {(float)cx + s * 1.6f, (float)cy};
+    Vector2 rtB = {(float)cx + s * 0.2f, (float)cy - s};
+    Vector2 rtC = {(float)cx + s * 0.2f, (float)cy + s};
+
+    auto draw_outline = [&](Vector2 a, Vector2 b, Vector2 c) {
+        DrawLineEx(a, b, 2.0f, outline);
+        DrawLineEx(b, c, 2.0f, outline);
+        DrawLineEx(c, a, 2.0f, outline);
+    };
+
+    if (forwardFill.a > 0) DrawTriangle(upA, upB, upC, forwardFill);
+    if (reverseFill.a > 0) DrawTriangle(dnA, dnB, dnC, reverseFill);
+    if (leftFill.a > 0) DrawTriangle(ltA, ltB, ltC, leftFill);
+    if (rightFill.a > 0) DrawTriangle(rtA, rtB, rtC, rightFill);
+
+    draw_outline(upA, upB, upC);
+    draw_outline(dnA, dnB, dnC);
+    draw_outline(ltA, ltB, ltC);
+    draw_outline(rtA, rtB, rtC);
 }
 
 static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
@@ -984,10 +1012,7 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
-                DrawText(TextFormat("Action: %s (%d)", ActionLabel(action), action),
-                         10, 132, 18, ActionColor(action));
-                DrawText(TextFormat("Throttle: %.1f | Steering: %.1f", accelerationInput, steeringInput),
-                         10, 152, 18, DARKBLUE);
+                DrawControlTriangles(86, 162, 16.0f, accelerationInput, steeringInput);
                 DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
             }
