@@ -152,6 +152,17 @@ To fine-tune a track from a base checkpoint:
 
 `--profile auto` chooses `base` for `sandbox` and `finetune` for non-sandbox tracks.
 
+To enable automatic curriculum stages:
+
+```bash
+./racing_trainer --track sandbox --profile base --curriculum auto
+```
+
+Curriculum stages (`auto`) advance on milestone evaluations:
+- `drive` -> `clean` when it starts finishing laps with controlled crashes
+- `clean` -> `pace` when finish rate and wall-hit stability are good
+- `pace` -> `corner` when finish pace improves consistently
+
 To train with live visualization (slower):
 
 ```bash
@@ -189,7 +200,7 @@ Track definitions are centralized in `track_config.h` (name, image path, spawn, 
 
 - Default track: `sandbox`
 - Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
-- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--render] [--render-trace] [--reset-training]`
+- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--reset-training]`
 
 F1 tracks are generated from `f1-circuits.geojson` with:
 

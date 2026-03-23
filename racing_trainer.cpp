@@ -512,12 +512,24 @@ int main(int argc, char* argv[]) {
         Base,
         Finetune
     };
+    enum class CurriculumMode {
+        Off,
+        Auto
+    };
+    enum class CurriculumStage {
+        Drive = 1,
+        Clean = 2,
+        Pace = 3,
+        Corner = 4
+    };
 
     int MILESTONE_FREQUENCY = 50;
     std::string trackName = "sandbox";
     std::string initModelPathArg;
     TrainingProfile profile = TrainingProfile::Auto;
     std::string profileLabel = "auto";
+    CurriculumMode curriculumMode = CurriculumMode::Off;
+    std::string curriculumLabel = "off";
     bool ENABLE_RENDER = false;
     bool ENABLE_RENDER_TRACE = false;
     bool RESET_TRAINING = false;
@@ -570,6 +582,24 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             initModelPathArg = argv[++i];
+        } else if (arg == "--curriculum") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --curriculum (expected: off|auto)\n";
+                return 1;
+            }
+            std::string c = argv[++i];
+            std::string lower = c;
+            std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) { return (char)std::tolower(ch); });
+            if (lower == "off") {
+                curriculumMode = CurriculumMode::Off;
+                curriculumLabel = "off";
+            } else if (lower == "auto") {
+                curriculumMode = CurriculumMode::Auto;
+                curriculumLabel = "auto";
+            } else {
+                std::cerr << "Invalid value for --curriculum: " << c << " (expected: off|auto)\n";
+                return 1;
+            }
         } else if (arg == "--render") {
             ENABLE_RENDER = true;
         } else if (arg == "--render-trace") {
@@ -583,9 +613,10 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--render] [--render-trace] [--reset-training]\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--reset-training]\n";
             std::cout << "Example (base): racing_trainer --track sandbox --profile base --render\n";
             std::cout << "Example (finetune): racing_trainer --track australian-gp --profile finetune --init-model ../trainedModels/base/best.pt\n";
+            std::cout << "Example (curriculum): racing_trainer --track sandbox --profile base --curriculum auto\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
             std::cerr << "Unknown option: " << arg << "\n";
@@ -630,10 +661,52 @@ int main(int argc, char* argv[]) {
         WARMUP_EPISODES = 2;
     }
 
+    struct StageParams {
+        const char* name;
+        float learning_rate;
+        float epsilon_start;
+        float epsilon_end;
+        float epsilon_decay;
+        float progress_gain;
+        float speed_progress_gain;
+        float wall_hit_penalty;
+        float grass_penalty_rate;
+        float step_penalty;
+        float checkpoint_reward;
+        float lap_reward;
+        float finish_reward;
+        float corner_drive_bonus;
+    };
+    auto get_stage_params = [&](CurriculumStage stage) -> StageParams {
+        switch (stage) {
+            case CurriculumStage::Drive:
+                // Base stage: prioritize stability/no-collision before speed.
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 450.0f, 0.0f};
+            case CurriculumStage::Clean:
+                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 50.0f, 220.0f, 550.0f, 0.0f};
+            case CurriculumStage::Pace:
+                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0100f, 16.0f, 3.0f, 0.010f, 55.0f, 240.0f, 600.0f, 0.0f};
+            case CurriculumStage::Corner:
+                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0110f, 16.0f, 3.0f, 0.012f, 55.0f, 240.0f, 650.0f, 0.004f};
+        }
+        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
+    };
+    CurriculumStage curriculumStage = CurriculumStage::Drive;
+    int curriculumStableEvals = 0;
+    double curriculumStageEntryBestSteps = -1.0;
+    if (curriculumMode == CurriculumMode::Auto) {
+        StageParams sp = get_stage_params(curriculumStage);
+        LEARNING_RATE = sp.learning_rate;
+        EPSILON_START = sp.epsilon_start;
+        EPSILON_END = sp.epsilon_end;
+        EPSILON_DECAY = sp.epsilon_decay;
+    }
+
     std::cout << "=== Racing DQN Training (CPU Optimized) ===\n";
     std::cout << "Milestone frequency: " << MILESTONE_FREQUENCY << " episodes\n";
     std::cout << "Track: " << track.name << "\n";
     std::cout << "Profile: " << profileLabel << "\n";
+    std::cout << "Curriculum: " << curriculumLabel << "\n";
     if (!initModelPathArg.empty()) {
         std::cout << "Init model: " << initModelPathArg << "\n";
     }
@@ -818,6 +891,28 @@ float epsilon = EPSILON_START;
     bool lr_dropped_once = false;
     bool lr_dropped_twice = false;
 
+    auto stage_to_string = [&](CurriculumStage s) -> const char* {
+        return get_stage_params(s).name;
+    };
+    auto apply_curriculum_stage = [&](CurriculumStage s, bool resetEpsilon) {
+        StageParams sp = get_stage_params(s);
+        dqn.set_learning_rate(sp.learning_rate);
+        EPSILON_END = sp.epsilon_end;
+        EPSILON_DECAY = sp.epsilon_decay;
+        if (resetEpsilon) {
+            epsilon = sp.epsilon_start;
+        } else {
+            epsilon = std::min(epsilon, sp.epsilon_start);
+            if (epsilon < EPSILON_END) epsilon = EPSILON_END;
+        }
+        std::cout << "Curriculum stage '" << sp.name << "' active"
+                  << " | LR=" << std::scientific << dqn.get_learning_rate()
+                  << " | eps_start=" << std::fixed << std::setprecision(3) << sp.epsilon_start
+                  << " | eps_end=" << sp.epsilon_end
+                  << " | eps_decay=" << sp.epsilon_decay
+                  << "\n";
+    };
+
     if (!useFreshScheduler && fs::is_regular_file(trackStatePath)) {
         std::ifstream stateFile(trackStatePath);
         std::unordered_map<std::string, std::string> state;
@@ -836,6 +931,18 @@ float epsilon = EPSILON_START;
             if (state.count("lr_dropped_once")) lr_dropped_once = (state["lr_dropped_once"] == "1");
             if (state.count("lr_dropped_twice")) lr_dropped_twice = (state["lr_dropped_twice"] == "1");
             if (state.count("learning_rate")) dqn.set_learning_rate(std::stof(state["learning_rate"]));
+            if (curriculumMode == CurriculumMode::Auto && state.count("curriculum_stage")) {
+                int st = std::stoi(state["curriculum_stage"]);
+                if (st >= (int)CurriculumStage::Drive && st <= (int)CurriculumStage::Corner) {
+                    curriculumStage = (CurriculumStage)st;
+                }
+            }
+            if (curriculumMode == CurriculumMode::Auto && state.count("curriculum_stable_evals")) {
+                curriculumStableEvals = std::max(0, std::stoi(state["curriculum_stable_evals"]));
+            }
+            if (curriculumMode == CurriculumMode::Auto && state.count("curriculum_stage_entry_best_steps")) {
+                curriculumStageEntryBestSteps = std::stod(state["curriculum_stage_entry_best_steps"]);
+            }
             std::cout << "Resumed training state from: " << trackStatePath.string()
                       << " (next episode: " << startEpisode << ", epsilon: " << epsilon << ")\n";
         } catch (...) {
@@ -845,6 +952,10 @@ float epsilon = EPSILON_START;
         std::cout << "Loaded init model with fresh scheduler state (episode=1, profile defaults).\n";
     } else if (resumedFromCheckpoint) {
         std::cout << "Checkpoint loaded, but no training_state.txt found. Continuing with default scheduler state.\n";
+    }
+
+    if (curriculumMode == CurriculumMode::Auto) {
+        apply_curriculum_stage(curriculumStage, useFreshScheduler || startEpisode <= 1);
     }
 
     auto save_training_state = [&](int nextEpisode) {
@@ -861,6 +972,9 @@ float epsilon = EPSILON_START;
         stateFile << "lr_dropped_once=" << (lr_dropped_once ? 1 : 0) << "\n";
         stateFile << "lr_dropped_twice=" << (lr_dropped_twice ? 1 : 0) << "\n";
         stateFile << "learning_rate=" << dqn.get_learning_rate() << "\n";
+        stateFile << "curriculum_stage=" << (int)curriculumStage << "\n";
+        stateFile << "curriculum_stable_evals=" << curriculumStableEvals << "\n";
+        stateFile << "curriculum_stage_entry_best_steps=" << curriculumStageEntryBestSteps << "\n";
     };
 
     for (int episode = startEpisode; !interrupted; episode++) {
@@ -895,6 +1009,9 @@ float epsilon = EPSILON_START;
         const float STUCK_DIST_THRESHOLD = 30.0f;
         const int STUCK_STRIKES_MAX = 3;
         const float STUCK_BREAK_PENALTY = 50.0f;
+        StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
+            ? get_stage_params(curriculumStage)
+            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
 
         std::vector<float> state = GetState(trackImage, position, angle, speed);
         std::vector<TraceSample> trace;
@@ -1031,16 +1148,23 @@ float epsilon = EPSILON_START;
             float distToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, position);
             float prevDistToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, prevPosition);
             float progress = prevDistToNextCP - distToNextCP;
-            reward += progress * 0.1f;
+            reward += progress * stageParams.progress_gain;
 
             if (progress > 0.0f){
-                reward += fabs(speed) * DT * 0.0075f;
+                reward += fabs(speed) * DT * stageParams.speed_progress_gain;
             }
 
-            if (hitWall) reward -= 10.0f;
-            if (surfaceFriction > 2.0f) reward -= 2.0f * DT;
+            if (hitWall) reward -= stageParams.wall_hit_penalty;
+            if (surfaceFriction > 2.0f) reward -= stageParams.grass_penalty_rate * DT;
 
-            reward -= 0.005f;
+            reward -= stageParams.step_penalty;
+            if (stageParams.corner_drive_bonus > 0.0f &&
+                fabs(steeringInput) > 0.1f &&
+                accelerationInput > 0.5f &&
+                speed > 40.0f &&
+                !hitWall) {
+                reward += fabs(speed) * DT * stageParams.corner_drive_bonus;
+            }
 
             if (fabs(speed) < V_IDLE && progress <= 0.0f) {
                 idleCounter++;
@@ -1060,16 +1184,16 @@ float epsilon = EPSILON_START;
 
                         if (allCrossed) {
                             cp.crossed = true;
-                            reward += 50.0f;
+                            reward += stageParams.checkpoint_reward;
                             currentLap++;
-                            reward += 200.0f;
+                            reward += stageParams.lap_reward;
 
                             for (auto& c : checkpoints) c.crossed = false;
                             nextCheckpoint = 1;
 
                             if (currentLap >= totalLaps) {
                                 raceFinished = true;
-                                reward += 500.0f;
+                                reward += stageParams.finish_reward;
                             }
                         } else {
                             cp.crossed = false;
@@ -1082,7 +1206,7 @@ float epsilon = EPSILON_START;
                 } else {
                     if (currentLap > 0 && nextCheckpoint != 0) {
                         cp.crossed = true;
-                        reward += 50.0f;
+                        reward += stageParams.checkpoint_reward;
                         nextCheckpoint = (nextCheckpoint + 1) % (int)checkpoints.size();
                     } else {
                         cp.crossed = false;
@@ -1181,13 +1305,13 @@ float epsilon = EPSILON_START;
         stats.episode_laps.push_back(currentLap);
         stats.episode_finishes.push_back(raceFinished ? 1 : 0);
 
-        if (raceFinished && !lr_dropped_once) {
+        if (curriculumMode == CurriculumMode::Off && raceFinished && !lr_dropped_once) {
             dqn.set_learning_rate(3e-4f);
             lr_dropped_once = true;
             std::cout << "LR schedule: first finish detected. Lowering LR to " << dqn.get_learning_rate() << "\n";
         }
 
-        if (!lr_dropped_twice && (int)stats.episode_finishes.size() >= 20) {
+        if (curriculumMode == CurriculumMode::Off && !lr_dropped_twice && (int)stats.episode_finishes.size() >= 20) {
             int countFin = 0;
             for (int i = (int)stats.episode_finishes.size() - 20; i < (int)stats.episode_finishes.size(); i++) {
                 countFin += stats.episode_finishes[i];
@@ -1219,6 +1343,7 @@ float epsilon = EPSILON_START;
                         << " | ε: " << std::setprecision(3) << epsilon
                         << " | Steps: " << episode_steps
                         << " | LR: " << std::scientific << dqn.get_learning_rate()
+                        << " | Stage: " << ((curriculumMode == CurriculumMode::Auto) ? stage_to_string(curriculumStage) : "manual")
                         << " | Time: " << std::fixed << duration.count() << "s"
                         << std::endl;
         }
@@ -1333,6 +1458,68 @@ float epsilon = EPSILON_START;
                 dqn.save_model(best_score_path);
                 std::cout << "★ Updated " << best_score_path << " (avg_score="
                         << std::fixed << std::setprecision(1) << best_score << ")\n";
+            }
+
+            if (curriculumMode == CurriculumMode::Auto) {
+                bool promote = false;
+                CurriculumStage nextStage = curriculumStage;
+
+                if (curriculumStage == CurriculumStage::Drive) {
+                    // Stage 1 goal: drive safely first (low collisions), then move to clean stage.
+                    if (eval.avg_wall_hits <= 0.80) {
+                        curriculumStableEvals++;
+                    } else {
+                        curriculumStableEvals = 0;
+                    }
+                    if (curriculumStableEvals >= 2) {
+                        promote = true;
+                        nextStage = CurriculumStage::Clean;
+                    }
+                } else if (curriculumStage == CurriculumStage::Clean) {
+                    // Stage 2 goal: clean finishes, low collision rate.
+                    if (eval.finish_rate >= 0.70 && eval.avg_wall_hits <= 0.50) {
+                        curriculumStableEvals++;
+                    } else {
+                        curriculumStableEvals = 0;
+                    }
+                    if (curriculumStableEvals >= 2) {
+                        promote = true;
+                        nextStage = CurriculumStage::Pace;
+                    }
+                } else if (curriculumStage == CurriculumStage::Pace) {
+                    // Stage 3 goal: improve finish pace.
+                    if (eval.finishes > 0 && eval.avg_steps_finish > 0.0) {
+                        if (curriculumStageEntryBestSteps < 0.0) {
+                            curriculumStageEntryBestSteps = eval.avg_steps_finish;
+                        }
+                        if (eval.finish_rate >= 0.70 &&
+                            eval.avg_steps_finish <= curriculumStageEntryBestSteps * 0.95) {
+                            curriculumStableEvals++;
+                        } else {
+                            curriculumStableEvals = 0;
+                        }
+                        if (eval.avg_steps_finish < curriculumStageEntryBestSteps) {
+                            curriculumStageEntryBestSteps = eval.avg_steps_finish;
+                        }
+                    } else {
+                        curriculumStableEvals = 0;
+                    }
+                    if (curriculumStableEvals >= 2) {
+                        promote = true;
+                        nextStage = CurriculumStage::Corner;
+                    }
+                }
+
+                if (promote && nextStage != curriculumStage) {
+                    curriculumStage = nextStage;
+                    curriculumStableEvals = 0;
+                    curriculumStageEntryBestSteps = -1.0;
+                    apply_curriculum_stage(curriculumStage, true);
+                    std::string stage_path = (trackModelDir / ("stage_" + std::string(stage_to_string(curriculumStage)) + ".pt")).string();
+                    dqn.save_model(stage_path);
+                    std::cout << "▲ Curriculum promoted to stage '" << stage_to_string(curriculumStage)
+                              << "' and checkpoint saved: " << stage_path << "\n";
+                }
             }
 
             std::cout << "\n";
