@@ -193,6 +193,8 @@ Recommended safe start values:
 ```
 
 Top-speed reward is only applied when there is forward checkpoint progress and no wall hit on that step.
+With `--curriculum auto`, top-speed reward is activated automatically in later stages
+(`pace` and `corner`) and stays off in early stability stages (`drive`, `clean`).
 
 ### Episode Budget and Evaluation
 

@@ -791,20 +791,22 @@ int main(int argc, char* argv[]) {
         float clean_lap_bonus;
         float finish_reward;
         float corner_drive_bonus;
+        float top_speed_reward_gain;
+        float top_speed_peak_bonus;
     };
     auto get_stage_params = [&](CurriculumStage stage) -> StageParams {
         switch (stage) {
             case CurriculumStage::Drive:
                 // Base stage: prioritize stability/no-collision before speed.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Clean:
-                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 50.0f, 220.0f, 220.0f, 550.0f, 0.0f};
+                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 50.0f, 220.0f, 220.0f, 550.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Pace:
-                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0100f, 16.0f, 3.0f, 0.010f, 55.0f, 240.0f, 180.0f, 600.0f, 0.0f};
+                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0100f, 16.0f, 3.0f, 0.010f, 55.0f, 240.0f, 180.0f, 600.0f, 0.0f, 0.0030f, 0.30f};
             case CurriculumStage::Corner:
-                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0110f, 16.0f, 3.0f, 0.012f, 55.0f, 240.0f, 160.0f, 650.0f, 0.004f};
+                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0110f, 16.0f, 3.0f, 0.012f, 55.0f, 240.0f, 160.0f, 650.0f, 0.004f, 0.0040f, 0.35f};
         }
-        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f};
+        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f};
     };
     CurriculumStage curriculumStage = CurriculumStage::Drive;
     int curriculumStableEvals = 0;
@@ -838,9 +840,15 @@ int main(int argc, char* argv[]) {
     std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
     std::cout << "Render trace: " << ((ENABLE_RENDER && ENABLE_RENDER_TRACE) ? "on" : "off") << "\n";
     std::cout << "Render lidar: " << ((ENABLE_RENDER && ENABLE_RENDER_LIDAR) ? "on" : "off") << "\n";
-    std::cout << "Top-speed reward: " << (ENABLE_TOP_SPEED_REWARD ? "on" : "off")
-              << " (gain=" << std::fixed << std::setprecision(4) << TOP_SPEED_REWARD_GAIN
-              << ", peak_bonus=" << TOP_SPEED_PEAK_BONUS << ")\n";
+    if (ENABLE_TOP_SPEED_REWARD) {
+        std::cout << "Top-speed reward: on(manual) (gain="
+                  << std::fixed << std::setprecision(4) << TOP_SPEED_REWARD_GAIN
+                  << ", peak_bonus=" << TOP_SPEED_PEAK_BONUS << ")\n";
+    } else if (curriculumMode == CurriculumMode::Auto) {
+        std::cout << "Top-speed reward: auto-by-stage (off in drive/clean, on in pace/corner)\n";
+    } else {
+        std::cout << "Top-speed reward: off\n";
+    }
     std::cout << "Reset training: " << (RESET_TRAINING ? "yes" : "no") << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
@@ -1166,7 +1174,7 @@ float epsilon = EPSILON_START;
         const float STUCK_BREAK_PENALTY = 50.0f;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
             ? get_stage_params(curriculumStage)
-            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 20.0f, 2.0f, 0.010f, 50.0f, 200.0f, 500.0f, 0.0f};
+            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 20.0f, 2.0f, 0.010f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f};
 
         std::vector<float> state = GetState(trackImage, position, angle, speed);
         std::vector<TraceSample> trace;
@@ -1342,11 +1350,17 @@ float epsilon = EPSILON_START;
             if (progress > 0.0f){
                 reward += fabs(speed) * DT * stageParams.speed_progress_gain;
             }
-            if (ENABLE_TOP_SPEED_REWARD && progress > 0.0f && !hitWall) {
+            bool useTopSpeedReward =
+                ENABLE_TOP_SPEED_REWARD ||
+                (curriculumMode == CurriculumMode::Auto &&
+                 (stageParams.top_speed_reward_gain > 0.0f || stageParams.top_speed_peak_bonus > 0.0f));
+            float activeTopSpeedGain = ENABLE_TOP_SPEED_REWARD ? TOP_SPEED_REWARD_GAIN : stageParams.top_speed_reward_gain;
+            float activeTopSpeedPeakBonus = ENABLE_TOP_SPEED_REWARD ? TOP_SPEED_PEAK_BONUS : stageParams.top_speed_peak_bonus;
+            if (useTopSpeedReward && progress > 0.0f && !hitWall) {
                 float absSpeed = fabs(speed);
-                reward += absSpeed * DT * TOP_SPEED_REWARD_GAIN;
+                reward += absSpeed * DT * activeTopSpeedGain;
                 if (absSpeed > episodeTopSpeed + 1.0f) {
-                    reward += TOP_SPEED_PEAK_BONUS;
+                    reward += activeTopSpeedPeakBonus;
                 }
             }
             if (fabs(speed) > episodeTopSpeed) {
