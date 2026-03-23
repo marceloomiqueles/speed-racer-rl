@@ -766,6 +766,7 @@ int main(int argc, char* argv[]) {
         float step_penalty;
         float checkpoint_reward;
         float lap_reward;
+        float clean_lap_bonus;
         float finish_reward;
         float corner_drive_bonus;
     };
@@ -773,15 +774,15 @@ int main(int argc, char* argv[]) {
         switch (stage) {
             case CurriculumStage::Drive:
                 // Base stage: prioritize stability/no-collision before speed.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 450.0f, 0.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f};
             case CurriculumStage::Clean:
-                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 50.0f, 220.0f, 550.0f, 0.0f};
+                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 50.0f, 220.0f, 220.0f, 550.0f, 0.0f};
             case CurriculumStage::Pace:
-                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0100f, 16.0f, 3.0f, 0.010f, 55.0f, 240.0f, 600.0f, 0.0f};
+                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0100f, 16.0f, 3.0f, 0.010f, 55.0f, 240.0f, 180.0f, 600.0f, 0.0f};
             case CurriculumStage::Corner:
-                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0110f, 16.0f, 3.0f, 0.012f, 55.0f, 240.0f, 650.0f, 0.004f};
+                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0110f, 16.0f, 3.0f, 0.012f, 55.0f, 240.0f, 160.0f, 650.0f, 0.004f};
         }
-        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
+        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f};
     };
     CurriculumStage curriculumStage = CurriculumStage::Drive;
     int curriculumStableEvals = 0;
@@ -1125,6 +1126,7 @@ float epsilon = EPSILON_START;
         int stuckCounter = 0;
         Vector2 lastCheckPosition = position;
         int consecutiveWallHits = 0;
+        int wallHitsThisLap = 0;
 
         int idleCounter = 0;
         const float V_IDLE = 8.0f;
@@ -1266,6 +1268,7 @@ float epsilon = EPSILON_START;
 
             if (hitWall) {
                 consecutiveWallHits++;
+                wallHitsThisLap++;
             } else {
                 consecutiveWallHits = 0;
             }
@@ -1347,7 +1350,11 @@ float epsilon = EPSILON_START;
                             reward += stageParams.checkpoint_reward;
                             currentLap++;
                             reward += stageParams.lap_reward;
+                            if (wallHitsThisLap == 0) {
+                                reward += stageParams.clean_lap_bonus;
+                            }
                             currentLapTime = 0.0f;
+                            wallHitsThisLap = 0;
 
                             auto bestIt = aiRecords.find(track.name);
                             double prevBest = (bestIt != aiRecords.end()) ? bestIt->second.time_seconds : 1e18;
