@@ -800,7 +800,7 @@ int main(int argc, char* argv[]) {
                 // Base stage: prioritize stability/no-collision before speed.
                 return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Clean:
-                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 50.0f, 220.0f, 220.0f, 550.0f, 0.0f, 0.0f, 0.0f};
+                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 62.0f, 300.0f, 220.0f, 550.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Pace:
                 return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0100f, 16.0f, 3.0f, 0.010f, 55.0f, 240.0f, 180.0f, 600.0f, 0.0f, 0.0030f, 0.30f};
             case CurriculumStage::Corner:
@@ -1397,12 +1397,17 @@ float epsilon = EPSILON_START;
 
                         if (allCrossed) {
                             float finishedLapTime = currentLapTime;
+                            bool lapWasClean = (wallHitsThisLap == 0);
+                            int lapIndexJustFinished = currentLap;
                             cp.crossed = true;
                             reward += stageParams.checkpoint_reward;
                             currentLap++;
                             reward += stageParams.lap_reward;
-                            if (wallHitsThisLap == 0) {
+                            if (lapWasClean) {
                                 reward += stageParams.clean_lap_bonus;
+                            }
+                            if (lapIndexJustFinished == 1) {
+                                reward += 120.0f; // Helps exit the common "stuck at lap 1" plateau.
                             }
                             currentLapTime = 0.0f;
                             wallHitsThisLap = 0;
@@ -1416,7 +1421,7 @@ float epsilon = EPSILON_START;
                                 rec.model = profileStorageKey + "_training";
                                 rec.updated_at_utc = NowUtcIso8601();
                                 rec.source = "ai_training";
-                                rec.clean_lap = (wallHitsThisLap == 0);
+                                rec.clean_lap = lapWasClean;
                                 aiRecords[track.name] = rec;
                                 aiRecordText = "AI Record: " + rec.time_text + " (" + rec.model + ")";
                                 if (SaveAiLapRecords(aiRecordsPath, aiRecords)) {
