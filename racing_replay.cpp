@@ -245,6 +245,10 @@ int main(int argc, char* argv[]) {
     std::cout << "=== Racing DQN Replay ===\n";
     std::cout << "Loading model: " << modelPath << std::endl;
     std::cout << "Track: " << track.name << std::endl;
+    if (track.is_stub) {
+        std::cout << "WARNING: track '" << track.name
+                  << "' is a stub and currently uses sandbox geometry.\n";
+    }
 
     const int screenWidth = track.screen_width;
     const int screenHeight = track.screen_height;
