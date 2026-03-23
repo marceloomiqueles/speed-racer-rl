@@ -144,6 +144,17 @@ To train a new agent:
 ./racing_trainer --track sandbox --profile base
 ```
 
+Apple Silicon (M1/M2/M3) performance notes:
+- Build in `Release` mode (`-O3` + LTO enabled in `CMakeLists.txt`)
+- Trainer uses all CPU threads by default
+- You can override LibTorch threads with env var `RACING_TORCH_THREADS`
+
+Example:
+
+```bash
+RACING_TORCH_THREADS=8 ./racing_trainer --track sandbox --profile base
+```
+
 To fine-tune a track from a base checkpoint:
 
 ```bash
