@@ -3,11 +3,13 @@ import json
 import math
 import os
 import subprocess
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "tracks_manifest.json"
 GEOJSON_PATH = Path("/tmp/f1-circuits.geojson")
+GEOJSON_URL = "https://raw.githubusercontent.com/bacinger/f1-circuits/master/f1-circuits.geojson"
 ASSETS_DIR = ROOT / "assets" / "tracks"
 LAYOUTS_PATH = ROOT / "generated" / "track_layouts.json"
 GENERATED_HEADER_PATH = ROOT / "generated" / "track_layouts_generated.h"
@@ -198,7 +200,13 @@ def main():
     if not MANIFEST_PATH.exists():
         raise SystemExit(f"Missing manifest: {MANIFEST_PATH}")
     if not GEOJSON_PATH.exists():
-        raise SystemExit(f"Missing geojson: {GEOJSON_PATH}")
+        try:
+            urllib.request.urlretrieve(GEOJSON_URL, GEOJSON_PATH)
+            print(f"Downloaded geojson to {GEOJSON_PATH}")
+        except Exception as exc:
+            raise SystemExit(
+                f"Missing geojson: {GEOJSON_PATH} and download failed from {GEOJSON_URL}: {exc}"
+            )
 
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     LAYOUTS_PATH.parent.mkdir(parents=True, exist_ok=True)
