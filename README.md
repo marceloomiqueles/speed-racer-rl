@@ -164,6 +164,12 @@ This generates:
 
 To regenerate from scratch, ensure `/tmp/f1-circuits.geojson` is available and rerun the script.
 
+To refresh normalized lap records in `tracks_manifest.json`:
+
+```bash
+./scripts/update_lap_records.py
+```
+
 ## Sample Models
 
 The `sampleModels/` directory contains trained checkpoints from different stages of learning.
