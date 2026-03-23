@@ -213,6 +213,14 @@ Trace colors:
 - orange: grass frames
 - red: wall-hit frames
 
+To render LIDAR rays in trainer:
+
+```bash
+./racing_trainer --track sandbox --render --render-lidar
+```
+
+In render mode, press `L` to toggle LIDAR visibility.
+
 To reset a track training run (checkpoints + scheduler state) and restart from episode 1:
 
 ```bash
@@ -236,7 +244,7 @@ Track definitions are centralized in `track_config.h` (name, image path, spawn, 
 
 - Default track: `sandbox`
 - Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
-- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--reset-training]`
+- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--render-lidar] [--reset-training]`
 
 F1 tracks are generated from `f1-circuits.geojson` with:
 

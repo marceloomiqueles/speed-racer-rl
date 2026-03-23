@@ -165,6 +165,19 @@ static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
     return checkpoints;
 }
 
+static const std::vector<float>& LidarOffsetsShort() {
+    static const std::vector<float> k = {
+        -PI/2, -5*PI/12, -PI/3, -PI/4, -PI/6, -PI/12, 0.0f,
+         PI/12, PI/6, PI/4, PI/3, 5*PI/12, PI/2
+    };
+    return k;
+}
+
+static const std::vector<float>& LidarOffsetsLong() {
+    static const std::vector<float> k = {-PI/6, -PI/12, 0.0f, PI/12, PI/6};
+    return k;
+}
+
 // LIDAR ray cast
 float CastLIDARRay(const Image& trackImage, Vector2 position, float angle, float maxDistance) {
     float distance = 0.0f;
@@ -209,23 +222,7 @@ std::vector<float> GetState(const Image& trackImage, Vector2 position, float ang
     const float LIDAR_RANGE = 200.0f;
     const float REFERENCE_DIST = 50.0f; // Distance at which danger ~= 1.0.
 
-    const float angleOffsets[] = {
-        -PI/2, // -90
-        -5*PI/12, // -75
-        -PI/3, // -60
-        -PI/4, // -45
-        -PI/6, // -30
-        -PI/12, // -15
-        0.0f, // 0
-        PI/12, // +15
-        PI/6, // +30
-        PI/4, // +45
-        PI/3, // +60
-        5*PI/12, // +75
-        PI/2 // +90
-    };
-
-    for (float offset : angleOffsets) {
+    for (float offset : LidarOffsetsShort()) {
         float d = CastLIDARRay(trackImage, position, angle + offset, LIDAR_RANGE);
 
 // Inverse normalization: close walls = high value.
@@ -239,15 +236,7 @@ std::vector<float> GetState(const Image& trackImage, Vector2 position, float ang
 // These help the network "see" a turn earlier without changing your short-range "danger" behavior.
     const float LONG_RANGE = 900.0f; // tune 700..1200 depending on track scale.
 
-    const float anticipateOffsets[] = {
-        -PI/6, // -30
-        -PI/12, // -15
-        0.0f, // 0
-        PI/12, // +15
-        PI/6 // +30
-    };
-
-    for (float offset : anticipateOffsets) {
+    for (float offset : LidarOffsetsLong()) {
         float d = CastLIDARRay(trackImage, position, angle + offset, LONG_RANGE);
         float norm = d / LONG_RANGE; // 0..1 where 1 means far/clear.
         if (norm < 0.0f) norm = 0.0f;
@@ -532,6 +521,7 @@ int main(int argc, char* argv[]) {
     std::string curriculumLabel = "off";
     bool ENABLE_RENDER = false;
     bool ENABLE_RENDER_TRACE = false;
+    bool ENABLE_RENDER_LIDAR = false;
     bool RESET_TRAINING = false;
     const int BATCH_SIZE = 32;
     const int REPLAY_BUFFER_SIZE = 50000;
@@ -604,6 +594,8 @@ int main(int argc, char* argv[]) {
             ENABLE_RENDER = true;
         } else if (arg == "--render-trace") {
             ENABLE_RENDER_TRACE = true;
+        } else if (arg == "--render-lidar") {
+            ENABLE_RENDER_LIDAR = true;
         } else if (arg == "--reset-training") {
             RESET_TRAINING = true;
         } else if (arg == "--milestone") {
@@ -613,7 +605,7 @@ int main(int argc, char* argv[]) {
             }
             MILESTONE_FREQUENCY = std::atoi(argv[++i]);
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--reset-training]\n";
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>] [--profile auto|base|finetune] [--init-model <path>] [--curriculum off|auto] [--render] [--render-trace] [--render-lidar] [--reset-training]\n";
             std::cout << "Example (base): racing_trainer --track sandbox --profile base --render\n";
             std::cout << "Example (finetune): racing_trainer --track australian-gp --profile finetune --init-model ../trainedModels/base/best.pt\n";
             std::cout << "Example (curriculum): racing_trainer --track sandbox --profile base --curriculum auto\n";
@@ -722,6 +714,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Warmup episodes: " << WARMUP_EPISODES << "\n";
     std::cout << "Render: " << (ENABLE_RENDER ? "on" : "off (headless)") << "\n";
     std::cout << "Render trace: " << ((ENABLE_RENDER && ENABLE_RENDER_TRACE) ? "on" : "off") << "\n";
+    std::cout << "Render lidar: " << ((ENABLE_RENDER && ENABLE_RENDER_LIDAR) ? "on" : "off") << "\n";
     std::cout << "Reset training: " << (RESET_TRAINING ? "yes" : "no") << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
@@ -891,6 +884,7 @@ int main(int argc, char* argv[]) {
 
     Texture2D trackTexture = {0};
     Texture2D carTexture = {0};
+    bool showLidar = ENABLE_RENDER_LIDAR;
     if (ENABLE_RENDER) {
         InitWindow(track.screen_width, track.screen_height, "Speed Racer - Trainer Render");
         SetTargetFPS(60);
@@ -1054,6 +1048,9 @@ float epsilon = EPSILON_START;
             if (ENABLE_RENDER && WindowShouldClose()) {
                 interrupted = 1;
                 break;
+            }
+            if (ENABLE_RENDER && IsKeyPressed(KEY_L)) {
+                showLidar = !showLidar;
             }
 
             Vector2 prevPosition = position;
@@ -1288,6 +1285,32 @@ float epsilon = EPSILON_START;
                     DrawLineEx(checkpoints[i].start, checkpoints[i].end, 3, cpColor);
                 }
 
+                if (showLidar) {
+                    const float shortRange = 200.0f;
+                    for (float off : LidarOffsetsShort()) {
+                        float rayAngle = angle + off;
+                        float d = CastLIDARRay(trackImage, position, rayAngle, shortRange);
+                        Vector2 hitPoint = {
+                            position.x + cosf(rayAngle) * d,
+                            position.y + sinf(rayAngle) * d
+                        };
+                        DrawLineV(position, hitPoint, Fade(ORANGE, 0.35f));
+                        DrawCircleV(hitPoint, 2.0f, ORANGE);
+                    }
+
+                    const float longRange = 900.0f;
+                    for (float off : LidarOffsetsLong()) {
+                        float rayAngle = angle + off;
+                        float d = CastLIDARRay(trackImage, position, rayAngle, longRange);
+                        Vector2 hitPoint = {
+                            position.x + cosf(rayAngle) * d,
+                            position.y + sinf(rayAngle) * d
+                        };
+                        DrawLineV(position, hitPoint, Fade(BLUE, 0.25f));
+                        DrawCircleV(hitPoint, 2.0f, BLUE);
+                    }
+                }
+
                 if (carTexture.id > 0) {
                     const float carTextureScale = track.car_scale;
                     Rectangle source = {0, 0, (float)carTexture.width, (float)carTexture.height};
@@ -1313,7 +1336,7 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
                 DrawControlPadTopRight(track.screen_width, action);
-                DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
+                DrawText("Trainer Render Mode (L: lidar, ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
             }
 
