@@ -150,7 +150,19 @@ Track definitions are centralized in `track_config.h` (name, image path, spawn, 
 - Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
 - Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>]`
 
-To add a new circuit, add another entry in `LoadTrackConfig(...)` and provide its asset in `assets/`.
+F1 tracks are generated from `f1-circuits.geojson` with:
+
+```bash
+./scripts/generate_f1_assets.py
+```
+
+This generates:
+
+- `assets/tracks/<slug>.png`
+- `generated/track_layouts.json` (spawn + checkpoints)
+- `generated/track_layouts_generated.h` (compiled into `track_config.h`)
+
+To regenerate from scratch, ensure `/tmp/f1-circuits.geojson` is available and rerun the script.
 
 ## Sample Models
 
