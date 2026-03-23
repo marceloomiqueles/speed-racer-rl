@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include <cctype>
+#include <ctime>
 
 // Ctrl+C support.
 volatile sig_atomic_t interrupted = 0;
@@ -163,6 +164,101 @@ static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
         checkpoints.push_back({cp.start, cp.end, false});
     }
     return checkpoints;
+}
+
+struct AiLapRecord {
+    double time_seconds = 1e18;
+    std::string time_text;
+    std::string model;
+    std::string updated_at_utc;
+    std::string source;
+};
+
+static std::string FormatLapSeconds(double sec) {
+    if (sec < 0.0) return "";
+    int minutes = (int)(sec / 60.0);
+    double rem = sec - (double)minutes * 60.0;
+    std::ostringstream oss;
+    oss << minutes << ":" << std::fixed << std::setprecision(3) << std::setw(6) << std::setfill('0') << rem;
+    return oss.str();
+}
+
+static std::string NowUtcIso8601() {
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &t);
+#else
+    gmtime_r(&t, &tm);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+    return std::string(buf);
+}
+
+static std::filesystem::path ResolveAiRecordsPath() {
+    namespace fs = std::filesystem;
+    if (fs::exists("README.md")) return fs::path("tracks_ai_records.csv");
+    if (fs::exists(fs::path("..") / "README.md")) return fs::path("..") / "tracks_ai_records.csv";
+    return fs::path("tracks_ai_records.csv");
+}
+
+static std::unordered_map<std::string, AiLapRecord> LoadAiLapRecords(const std::filesystem::path& path) {
+    std::unordered_map<std::string, AiLapRecord> out;
+    std::ifstream in(path);
+    if (!in.is_open()) return out;
+
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        if (line.rfind("track_slug,", 0) == 0) continue;
+        std::stringstream ss(line);
+        std::string slug, sec, timeText, model, updated, source;
+        if (!std::getline(ss, slug, ',')) continue;
+        if (!std::getline(ss, sec, ',')) continue;
+        if (!std::getline(ss, timeText, ',')) continue;
+        if (!std::getline(ss, model, ',')) continue;
+        if (!std::getline(ss, updated, ',')) continue;
+        std::getline(ss, source);
+        try {
+            AiLapRecord rec;
+            rec.time_seconds = std::stod(sec);
+            rec.time_text = timeText;
+            rec.model = model;
+            rec.updated_at_utc = updated;
+            rec.source = source;
+            out[slug] = rec;
+        } catch (...) {
+        }
+    }
+    return out;
+}
+
+static bool SaveAiLapRecords(const std::filesystem::path& path,
+                             const std::unordered_map<std::string, AiLapRecord>& records) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (path.has_parent_path()) {
+        fs::create_directories(path.parent_path(), ec);
+    }
+    std::ofstream out(path, std::ios::trunc);
+    if (!out.is_open()) return false;
+
+    out << "track_slug,time_seconds,time_text,model,updated_at_utc,source\n";
+    std::vector<std::string> keys;
+    keys.reserve(records.size());
+    for (const auto& kv : records) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    for (const auto& slug : keys) {
+        const auto& r = records.at(slug);
+        out << slug << ","
+            << std::fixed << std::setprecision(3) << r.time_seconds << ","
+            << r.time_text << ","
+            << r.model << ","
+            << r.updated_at_utc << ","
+            << r.source << "\n";
+    }
+    return true;
 }
 
 static const std::vector<float>& LidarOffsetsShort() {
@@ -758,6 +854,12 @@ int main(int argc, char* argv[]) {
     fs::path externalLegacyBestTimePath = externalTrackModelDirLegacy / "best_time.pt";
     fs::path trackFinalPath = trackProfileDir / "model_final.pt";
     fs::path resumeModelPath;
+    fs::path aiRecordsPath = ResolveAiRecordsPath();
+    auto aiRecords = LoadAiLapRecords(aiRecordsPath);
+    std::string aiRecordText = "AI Record: N/A";
+    if (aiRecords.count(track.name) && aiRecords[track.name].time_seconds < 1e17) {
+        aiRecordText = "AI Record: " + aiRecords[track.name].time_text + " (" + aiRecords[track.name].model + ")";
+    }
 
     std::error_code ec;
     if (RESET_TRAINING) {
@@ -1009,6 +1111,7 @@ float epsilon = EPSILON_START;
         const int totalLaps = 3;
         int nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
         bool raceFinished = false;
+        float currentLapTime = 0.0f;
 
         float episode_reward = 0.0f;
         int episode_steps = 0;
@@ -1055,6 +1158,7 @@ float epsilon = EPSILON_START;
             }
 
             Vector2 prevPosition = position;
+            currentLapTime += DT;
 
             if (episode_steps % STUCK_CHECK_INTERVAL == 0 && episode_steps > 0) {
                 float dx = position.x - lastCheckPosition.x;
@@ -1230,10 +1334,33 @@ float epsilon = EPSILON_START;
                         }
 
                         if (allCrossed) {
+                            float finishedLapTime = currentLapTime;
                             cp.crossed = true;
                             reward += stageParams.checkpoint_reward;
                             currentLap++;
                             reward += stageParams.lap_reward;
+                            currentLapTime = 0.0f;
+
+                            auto bestIt = aiRecords.find(track.name);
+                            double prevBest = (bestIt != aiRecords.end()) ? bestIt->second.time_seconds : 1e18;
+                            if (finishedLapTime > 0.0f && finishedLapTime < prevBest) {
+                                AiLapRecord rec;
+                                rec.time_seconds = (double)finishedLapTime;
+                                rec.time_text = FormatLapSeconds(rec.time_seconds);
+                                rec.model = profileStorageKey + "_training";
+                                rec.updated_at_utc = NowUtcIso8601();
+                                rec.source = "ai_training";
+                                aiRecords[track.name] = rec;
+                                aiRecordText = "AI Record: " + rec.time_text + " (" + rec.model + ")";
+                                if (SaveAiLapRecords(aiRecordsPath, aiRecords)) {
+                                    std::cout << "★ AI lap record updated for " << track.name
+                                              << ": " << rec.time_text << " (" << rec.time_seconds
+                                              << "s) @ " << aiRecordsPath.string() << "\n";
+                                } else {
+                                    std::cout << "Warning: failed to write AI lap records to "
+                                              << aiRecordsPath.string() << "\n";
+                                }
+                            }
 
                             for (auto& c : checkpoints) c.crossed = false;
                             nextCheckpoint = 1;
@@ -1361,6 +1488,7 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
+                DrawText(aiRecordText.c_str(), 10, 132, 18, DARKGREEN);
                 DrawControlPadTopRight(track.screen_width, action);
                 DrawText("Trainer Render Mode (L: lidar, ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
