@@ -163,6 +163,27 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `clean` -> `pace` when finish rate and wall-hit stability are good
 - `pace` -> `corner` when finish pace improves consistently
 
+### Episode Budget and Evaluation
+
+Recommended episode budgets (practical ranges):
+- Base (`sandbox`, profile `base`): `3,000` to `8,000` episodes
+- Track fine-tune (`finetune` + `--init-model`): `500` to `2,500` episodes per track
+
+Evaluation cadence:
+- Keep `--milestone 50` (default) so every 50 episodes you get a greedy eval (`20` episodes)
+- Do not tune hyperparameters before at least `1,000` episodes unless there is an obvious bug
+
+Primary metrics to watch:
+- `finish_rate` (first priority)
+- `avg_wall_hits` (safety / clean driving)
+- `avg_steps_finish` (pace proxy; lower is better)
+- `avg_score` (overall trend, secondary)
+
+Decision rules:
+- Continue training when metrics are still improving every 2-3 milestone evals
+- Stop a run when `finish_rate >= 70%` is stable for 2-3 evals and `avg_steps_finish` improvement is <5%
+- Consider reward/profile adjustments when after `1,000-3,000` episodes you still have `finish_rate = 0%` or flat safety/pace metrics
+
 To train with live visualization (slower):
 
 ```bash

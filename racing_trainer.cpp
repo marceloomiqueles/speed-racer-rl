@@ -1019,6 +1019,7 @@ float epsilon = EPSILON_START;
         const float WRONG_WAY_DOT_THRESHOLD = -0.20f;
         const int WRONG_WAY_GRACE_FRAMES = 8;
         int wrongWayCounter = 0;
+        bool wrongWayActive = false;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
             ? get_stage_params(curriculumStage)
             : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 500.0f, 0.0f};
@@ -1188,11 +1189,13 @@ float epsilon = EPSILON_START;
                 } else {
                     wrongWayCounter = 0;
                 }
-                if (wrongWayCounter > WRONG_WAY_GRACE_FRAMES) {
+                wrongWayActive = (wrongWayCounter > WRONG_WAY_GRACE_FRAMES);
+                if (wrongWayActive) {
                     reward -= WRONG_WAY_PENALTY * speedAbs * DT;
                 }
             } else {
                 wrongWayCounter = 0;
+                wrongWayActive = false;
             }
 
             if (hitWall) reward -= stageParams.wall_hit_penalty;
@@ -1329,6 +1332,9 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
+                if (wrongWayActive) {
+                    DrawText("WRONG WAY", 10, 132, 22, RED);
+                }
                 DrawControlPadTopRight(track.screen_width, action);
                 DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
