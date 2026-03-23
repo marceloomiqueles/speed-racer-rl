@@ -72,6 +72,11 @@ inline TrackConfig BuildF1StubTrack(
     t.lon = lon;
     t.is_stub = true;
     ApplyGeneratedLayout(slug, t);
+    if (slug == "australian-gp") {
+        // Align with sandbox semantics: spawn before CP0 so forward crosses start/finish.
+        t.spawn_position = {380.18f, 648.65f};
+        t.spawn_angle = -2.463133f;
+    }
     return t;
 }
 
