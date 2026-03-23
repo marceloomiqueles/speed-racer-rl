@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <thread>
+#include <cstdlib>
 
 // Simple MLP policy network.
 struct DQNNetImpl : torch::nn::Module {
@@ -39,8 +40,22 @@ public:
           current_lr_(learning_rate) {
 
         std::cout << "Using CPU for training" << std::endl;
-        torch::set_num_threads(std::thread::hardware_concurrency());
-        std::cout << "Using " << torch::get_num_threads() << " CPU threads" << std::endl;
+        unsigned int hw = std::thread::hardware_concurrency();
+        int intra_threads = (hw > 0) ? (int)hw : 4;
+        const char* env_threads = std::getenv("RACING_TORCH_THREADS");
+        if (env_threads != nullptr) {
+            try {
+                int v = std::stoi(env_threads);
+                if (v > 0) intra_threads = v;
+            } catch (...) {
+            }
+        }
+        torch::set_num_threads(intra_threads);
+        // For this workload, lower inter-op contention generally helps.
+        torch::set_num_interop_threads(1);
+        std::cout << "Using " << torch::get_num_threads() << " CPU threads"
+                  << " (interop=" << torch::get_num_interop_threads() << ")"
+                  << std::endl;
 
         policy_net_ = DQNNet(state_size_, action_size_);
         target_net_ = DQNNet(state_size_, action_size_);
