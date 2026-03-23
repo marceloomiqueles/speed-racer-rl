@@ -125,7 +125,7 @@ This produces separate trainer and replay executables.
 To visualize a file from `sampleModels/`:
 
 ```bash
-./racing_replay sampleModels/best.pt
+./racing_replay sampleModels/best_time.pt
 ```
 
 Replay runs in real time and renders the environment, vehicle, and perception rays.
@@ -153,4 +153,3 @@ Typical progression:
 - fine-tuned models: stable multi-lap behavior
 
 These models are included for demonstration and replay purposes.
-

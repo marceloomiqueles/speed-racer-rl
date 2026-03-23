@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <filesystem>
 
 // Track pixel helpers
 bool IsWall(Color color) {
@@ -164,6 +165,36 @@ int main(int argc, char* argv[]) {
     }
 
     std::string modelPath = argv[1];
+    namespace fs = std::filesystem;
+
+    if (!fs::exists(modelPath)) {
+        std::cerr << "Model file not found: " << modelPath << "\n";
+
+        fs::path sampleDir = "sampleModels";
+        if (!fs::exists(sampleDir)) {
+            sampleDir = "../sampleModels";
+        }
+
+        if (fs::exists(sampleDir) && fs::is_directory(sampleDir)) {
+            std::vector<std::string> ptFiles;
+            for (const auto& entry : fs::directory_iterator(sampleDir)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".pt") {
+                    ptFiles.push_back(entry.path().filename().string());
+                }
+            }
+
+            if (!ptFiles.empty()) {
+                std::sort(ptFiles.begin(), ptFiles.end());
+                std::cerr << "Available models in " << sampleDir.string() << ":\n";
+                for (const auto& file : ptFiles) {
+                    std::cerr << "  - " << file << "\n";
+                }
+            }
+        }
+
+        std::cerr << "Tip: from build/, try: ./racing_replay ../sampleModels/best_time.pt\n";
+        return 1;
+    }
 
     std::cout << "=== Racing DQN Replay ===\n";
     std::cout << "Loading model: " << modelPath << std::endl;
