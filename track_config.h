@@ -90,7 +90,7 @@ inline void ApplyTrackRuntimeOverrides(TrackConfig& track) {
 inline std::vector<TrackCheckpoint> SandboxCheckpoints() {
     return {
         {{450.0f, 35.0f},  {450.0f, 150.0f}},
-        {{719.0f, 260.0f}, {850.0f, 260.0f}},
+        {{719.0f, 260.0f}, {852.0f, 260.0f}},
         {{850.0f, 665.0f}, {723.0f, 665.0f}},
         {{523.0f, 482.0f}, {625.0f, 517.0f}},
         {{409.0f, 438.0f}, {295.0f, 413.0f}},
