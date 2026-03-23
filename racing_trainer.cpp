@@ -57,6 +57,32 @@ struct Checkpoint {
     }
 };
 
+static const char* ActionLabel(int action) {
+    switch (action) {
+        case 0: return "forward";
+        case 1: return "reverse";
+        case 2: return "left";
+        case 3: return "right";
+        case 4: return "forward+left";
+        case 5: return "forward+right";
+        case 6: return "idle";
+        default: return "unknown";
+    }
+}
+
+static Color ActionColor(int action) {
+    switch (action) {
+        case 0: return GREEN;   // forward
+        case 1: return RED;     // reverse
+        case 2: return YELLOW;  // left
+        case 3: return YELLOW;  // right
+        case 4: return YELLOW;  // forward+left
+        case 5: return YELLOW;  // forward+right
+        case 6: return LIGHTGRAY;
+        default: return WHITE;
+    }
+}
+
 static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
     std::vector<Checkpoint> checkpoints;
     checkpoints.reserve(track.checkpoints.size());
@@ -958,6 +984,10 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Speed: %.1f", fabs(speed)), 10, 72, 18, DARKGRAY);
                 DrawText(TextFormat("Reward: %.2f", episode_reward), 10, 92, 18, DARKGRAY);
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
+                DrawText(TextFormat("Action: %s (%d)", ActionLabel(action), action),
+                         10, 132, 18, ActionColor(action));
+                DrawText(TextFormat("Throttle: %.1f | Steering: %.1f", accelerationInput, steeringInput),
+                         10, 152, 18, DARKBLUE);
                 DrawText("Trainer Render Mode (ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
             }
