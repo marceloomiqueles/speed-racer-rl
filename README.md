@@ -125,7 +125,7 @@ This produces separate trainer and replay executables.
 To visualize a file from `sampleModels/`:
 
 ```bash
-./racing_replay sampleModels/best_time.pt
+./racing_replay sampleModels/best_time.pt --track sandbox
 ```
 
 Replay runs in real time and renders the environment, vehicle, and perception rays.
@@ -135,12 +135,22 @@ Replay runs in real time and renders the environment, vehicle, and perception ra
 To train a new agent:
 
 ```bash
-./racing_trainer
+./racing_trainer --track sandbox
 ```
 
 Training runs headless and periodically saves model checkpoints.
 
 Exact behavior (episode length, epsilon schedule, learning rate, etc.) is defined in code and can be adjusted in `racing_trainer.cpp`.
+
+## Tracks
+
+Track definitions are centralized in `track_config.h` (name, image path, spawn, checkpoints, viewport).
+
+- Default track: `sandbox`
+- Replay CLI: `./racing_replay <model_path> [--track <track_name>]`
+- Trainer CLI: `./racing_trainer [--milestone <episodes>] [--track <track_name>]`
+
+To add a new circuit, add another entry in `LoadTrackConfig(...)` and provide its asset in `assets/`.
 
 ## Sample Models
 

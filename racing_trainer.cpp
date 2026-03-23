@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include "dqn.h"
 #include "replay_buffer.h"
+#include "track_config.h"
 
 #include <cmath>
 #include <vector>
@@ -53,6 +54,15 @@ struct Checkpoint {
         return (t >= 0 && t <= 1 && u >= 0 && u <= 1);
     }
 };
+
+static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
+    std::vector<Checkpoint> checkpoints;
+    checkpoints.reserve(track.checkpoints.size());
+    for (const auto& cp : track.checkpoints) {
+        checkpoints.push_back({cp.start, cp.end, false});
+    }
+    return checkpoints;
+}
 
 // LIDAR ray cast
 float CastLIDARRay(const Image& trackImage, Vector2 position, float angle, float maxDistance) {
@@ -187,6 +197,8 @@ static EvalResult EvaluateGreedy(
     DQN& dqn,
     const Image& trackImage,
     const std::vector<Checkpoint>& checkpointsTemplate,
+    const Vector2& spawnPosition,
+    float spawnAngle,
     int evalEpisodes,
     int max_steps,
     float DT
@@ -224,9 +236,9 @@ static EvalResult EvaluateGreedy(
         std::vector<Checkpoint> checkpoints = checkpointsTemplate;
         for (auto& cp : checkpoints) cp.crossed = false;
 
-        Vector2 position = {430, 92};
+        Vector2 position = spawnPosition;
         Vector2 velocity = {0, 0};
-        float angle = 0.0f;
+        float angle = spawnAngle;
         float speed = 0.0f;
 
         int currentLap = -1;
@@ -394,6 +406,7 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signal_handler);
 
     int MILESTONE_FREQUENCY = 50;
+    std::string trackName = "sandbox";
     const int BATCH_SIZE = 32;
     const int REPLAY_BUFFER_SIZE = 50000;
 
@@ -408,33 +421,59 @@ int main(int argc, char* argv[]) {
     const int TRAIN_EVERY_N_STEPS = 3;
     const int max_steps = 7500;
 
-    if (argc > 1) {
-        MILESTONE_FREQUENCY = std::atoi(argv[1]);
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--track") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --track\n";
+                return 1;
+            }
+            trackName = argv[++i];
+        } else if (arg == "--milestone") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --milestone\n";
+                return 1;
+            }
+            MILESTONE_FREQUENCY = std::atoi(argv[++i]);
+        } else if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: racing_trainer [--milestone <episodes>] [--track <track_name>]\n";
+            std::cout << "Example: racing_trainer --milestone 50 --track sandbox\n";
+            return 0;
+        } else if (!arg.empty() && arg[0] == '-') {
+            std::cerr << "Unknown option: " << arg << "\n";
+            return 1;
+        } else {
+            MILESTONE_FREQUENCY = std::atoi(arg.c_str());
+        }
+    }
+
+    TrackConfig track;
+    std::string trackError;
+    if (!LoadTrackConfig(trackName, track, trackError)) {
+        std::cerr << trackError << "\n";
+        std::cerr << "Available tracks:\n";
+        for (const auto& name : GetAvailableTrackNames()) {
+            std::cerr << "  - " << name << "\n";
+        }
+        return 1;
     }
 
     std::cout << "=== Racing DQN Training (CPU Optimized) ===\n";
     std::cout << "Milestone frequency: " << MILESTONE_FREQUENCY << " episodes\n";
+    std::cout << "Track: " << track.name << "\n";
     std::cout << "Batch size: " << BATCH_SIZE << "\n";
     std::cout << "Press Ctrl+C to save and exit gracefully\n";
     std::cout << "==========================================\n\n";
 
     SetTraceLogLevel(LOG_ERROR);
 
-    Image trackImage = LoadImage("assets/raceTrackFullyWalled.png");
+    Image trackImage = LoadImage(track.image_path.c_str());
     if (trackImage.data == NULL) {
         std::cerr << "Failed to load track image!\n";
         return 1;
     }
 
-    std::vector<Checkpoint> checkpointsTemplate;
-    checkpointsTemplate.push_back({{450,35},  {450,150}, false});
-    checkpointsTemplate.push_back({{719,260}, {850,260}, false});
-    checkpointsTemplate.push_back({{850,665}, {723,665}, false});
-    checkpointsTemplate.push_back({{523,482}, {625,517}, false});
-    checkpointsTemplate.push_back({{409,438}, {295,413}, false});
-    checkpointsTemplate.push_back({{160, 730}, {220, 815}, false});
-    checkpointsTemplate.push_back({{138, 600}, {49, 600}, false});
-    checkpointsTemplate.push_back({{138,205}, {49,205},  false});
+    std::vector<Checkpoint> checkpointsTemplate = BuildCheckpoints(track);
 
     const float MAX_SPEED = 300.0f;
     const float ACCELERATION = 150.0f;
@@ -480,9 +519,9 @@ float epsilon = EPSILON_START;
         std::vector<Checkpoint> checkpoints = checkpointsTemplate;
         for (auto& cp : checkpoints) cp.crossed = false;
 
-        Vector2 position = {430, 92};
+        Vector2 position = track.spawn_position;
         Vector2 velocity = {0, 0};
-        float angle = 0.0f;
+        float angle = track.spawn_angle;
         float speed = 0.0f;
 
         int currentLap = -1;
@@ -792,7 +831,16 @@ float epsilon = EPSILON_START;
 
             const int EVAL_MAX_STEPS = max_steps;
 
-            auto eval = EvaluateGreedy(dqn, trackImage, checkpointsTemplate, EVAL_EPISODES, EVAL_MAX_STEPS, DT);
+            auto eval = EvaluateGreedy(
+                dqn,
+                trackImage,
+                checkpointsTemplate,
+                track.spawn_position,
+                track.spawn_angle,
+                EVAL_EPISODES,
+                EVAL_MAX_STEPS,
+                DT
+            );
             dqn.set_training_mode(true);
 
             std::cout << "\n✓ Milestone " << episode << " saved!\n";

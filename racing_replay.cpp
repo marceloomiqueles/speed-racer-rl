@@ -1,6 +1,7 @@
 // racing_replay.cpp.
 #include "raylib.h"
 #include "dqn.h"
+#include "track_config.h"
 #include <cmath>
 #include <vector>
 #include <iostream>
@@ -48,6 +49,15 @@ struct Checkpoint {
         return (t >= 0 && t <= 1 && u >= 0 && u <= 1);
     }
 };
+
+static std::vector<Checkpoint> BuildCheckpoints(const TrackConfig& track) {
+    std::vector<Checkpoint> checkpoints;
+    checkpoints.reserve(track.checkpoints.size());
+    for (const auto& cp : track.checkpoints) {
+        checkpoints.push_back({cp.start, cp.end, false});
+    }
+    return checkpoints;
+}
 
 // LIDAR sensor with visualization
 float CastRay(const Image& trackImage, Vector2 position, float angle, float maxDistance,
@@ -158,13 +168,49 @@ std::vector<float> GetState(const Image& trackImage, Vector2 position, float ang
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cout << "Usage: racing_replay <model_path>\n";
-        std::cout << "Example: racing_replay models/model_episode_450.pt\n";
+    std::string modelPath;
+    std::string trackName = "sandbox";
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--track") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --track\n";
+                return 1;
+            }
+            trackName = argv[++i];
+        } else if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: racing_replay <model_path> [--track <track_name>]\n";
+            std::cout << "Example: racing_replay models/model_episode_450.pt --track sandbox\n";
+            return 0;
+        } else if (!arg.empty() && arg[0] == '-') {
+            std::cerr << "Unknown option: " << arg << "\n";
+            return 1;
+        } else if (modelPath.empty()) {
+            modelPath = arg;
+        } else {
+            std::cerr << "Unexpected argument: " << arg << "\n";
+            return 1;
+        }
+    }
+
+    if (modelPath.empty()) {
+        std::cout << "Usage: racing_replay <model_path> [--track <track_name>]\n";
+        std::cout << "Example: racing_replay models/model_episode_450.pt --track sandbox\n";
         return 1;
     }
 
-    std::string modelPath = argv[1];
+    TrackConfig track;
+    std::string trackError;
+    if (!LoadTrackConfig(trackName, track, trackError)) {
+        std::cerr << trackError << "\n";
+        std::cerr << "Available tracks:\n";
+        for (const auto& name : GetAvailableTrackNames()) {
+            std::cerr << "  - " << name << "\n";
+        }
+        return 1;
+    }
+
     namespace fs = std::filesystem;
 
     if (!fs::exists(modelPath)) {
@@ -198,9 +244,10 @@ int main(int argc, char* argv[]) {
 
     std::cout << "=== Racing DQN Replay ===\n";
     std::cout << "Loading model: " << modelPath << std::endl;
+    std::cout << "Track: " << track.name << std::endl;
 
-    const int screenWidth = 900;
-    const int screenHeight = 900;
+    const int screenWidth = track.screen_width;
+    const int screenHeight = track.screen_height;
     InitWindow(screenWidth, screenHeight, "Speed Racer - AI Replay");
 
 // Physics constants (match trainer).
@@ -211,20 +258,12 @@ int main(int argc, char* argv[]) {
     const float TURN_SPEED_FACTOR = 0.3f;
 
 // Load assets
-    Image trackImage = LoadImage("assets/raceTrackFullyWalled.png");
+    Image trackImage = LoadImage(track.image_path.c_str());
     Texture2D trackTexture = LoadTextureFromImage(trackImage);
     Texture2D carTexture = LoadTexture("assets/racecarTransparent.png");
 
 // Setup checkpoints
-    std::vector<Checkpoint> checkpoints;
-    checkpoints.push_back({{450,35}, {450, 150}, false});
-    checkpoints.push_back({{719, 260}, {850, 260}, false});
-    checkpoints.push_back({{850, 665}, {723, 665}, false});
-    checkpoints.push_back({{523, 482}, {625, 517}, false});
-    checkpoints.push_back({{409, 438}, {295, 413}, false});
-    checkpoints.push_back({{160, 730}, {220, 815}, false});
-    checkpoints.push_back({{138, 600}, {49, 600}, false});
-    checkpoints.push_back({{138, 205}, {49, 205}, false});
+    std::vector<Checkpoint> checkpoints = BuildCheckpoints(track);
 
 // Initialize DQN agent
     const int STATE_SIZE = 23; // MUST match trainer now
@@ -251,9 +290,9 @@ int main(int argc, char* argv[]) {
     }
 
 // Car state
-    Vector2 position = {430, 92};
+    Vector2 position = track.spawn_position;
     Vector2 velocity = {0, 0};
-    float angle = 0.0f;
+    float angle = track.spawn_angle;
     float speed = 0.0f;
 
 // Race state
@@ -277,10 +316,10 @@ int main(int argc, char* argv[]) {
         if (raceStarted && !raceFinished) currentLapTime += dt;
 
         if (IsKeyPressed(KEY_SPACE)) {
-            position = {430, 92};
+            position = track.spawn_position;
             velocity = {0, 0};
             speed = 0;
-            angle = 0;
+            angle = track.spawn_angle;
             currentLap = 0;
             currentLapTime = 0;
             raceStarted = true;
