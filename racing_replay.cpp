@@ -318,6 +318,7 @@ int main(int argc, char* argv[]) {
     int nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
 
     bool showLidar = true;
+    int consecutiveWallHits = 0;
 
     SetTargetFPS(60);
 
@@ -417,11 +418,34 @@ int main(int argc, char* argv[]) {
             Color currentColor = GetImageColor(trackImage, pixelX, pixelY);
             if (IsWall(currentColor)) {
                 position = prevPosition;
-                speed *= -0.3f;
+                speed = 0.0f;
+                consecutiveWallHits++;
+            } else {
+                consecutiveWallHits = 0;
             }
         } else {
             position = prevPosition;
-            speed *= -0.3f;
+            speed = 0.0f;
+            consecutiveWallHits++;
+        }
+
+        if (consecutiveWallHits >= 3) {
+            Checkpoint& cpTarget = checkpoints[nextCheckpoint];
+            Vector2 cpMid = {
+                (cpTarget.start.x + cpTarget.end.x) * 0.5f,
+                (cpTarget.start.y + cpTarget.end.y) * 0.5f
+            };
+            Vector2 toCp = {cpMid.x - position.x, cpMid.y - position.y};
+            float toCpLen = sqrtf(toCp.x * toCp.x + toCp.y * toCp.y);
+            if (toCpLen > 1e-3f) {
+                toCp.x /= toCpLen;
+                toCp.y /= toCpLen;
+                angle = atan2f(toCp.y, toCp.x);
+                position.x += toCp.x * 3.0f;
+                position.y += toCp.y * 3.0f;
+                speed = 20.0f;
+            }
+            consecutiveWallHits = 0;
         }
 
 // Checkpoint detection (expected checkpoint only).

@@ -1017,6 +1017,7 @@ float epsilon = EPSILON_START;
 
         int stuckCounter = 0;
         Vector2 lastCheckPosition = position;
+        int consecutiveWallHits = 0;
 
         int idleCounter = 0;
         const float V_IDLE = 8.0f;
@@ -1143,12 +1144,37 @@ float epsilon = EPSILON_START;
                 if (IsWall(currentColor)) {
                     hitWall = true;
                     position = prevPosition;
-                    speed *= -0.3f;
+                    speed = 0.0f;
                 }
             } else {
                 hitWall = true;
                 position = prevPosition;
-                speed *= -0.3f;
+                speed = 0.0f;
+            }
+
+            if (hitWall) {
+                consecutiveWallHits++;
+            } else {
+                consecutiveWallHits = 0;
+            }
+
+            if (consecutiveWallHits >= 3) {
+                Checkpoint& cpTarget = checkpoints[nextCheckpoint];
+                Vector2 cpMid = {
+                    (cpTarget.start.x + cpTarget.end.x) * 0.5f,
+                    (cpTarget.start.y + cpTarget.end.y) * 0.5f
+                };
+                Vector2 toCp = {cpMid.x - position.x, cpMid.y - position.y};
+                float toCpLen = sqrtf(toCp.x * toCp.x + toCp.y * toCp.y);
+                if (toCpLen > 1e-3f) {
+                    toCp.x /= toCpLen;
+                    toCp.y /= toCpLen;
+                    angle = atan2f(toCp.y, toCp.x);
+                    position.x += toCp.x * 3.0f;
+                    position.y += toCp.y * 3.0f;
+                    speed = 20.0f;
+                }
+                consecutiveWallHits = 0;
             }
 
             if (ENABLE_RENDER && ENABLE_RENDER_TRACE) {
