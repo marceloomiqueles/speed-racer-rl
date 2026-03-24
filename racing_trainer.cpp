@@ -92,12 +92,12 @@ static void DrawControlTriangles(int cx, int cy, float s, float accelerationInpu
     Vector2 upC = {(float)cx + s, (float)cy - s * 0.2f};
 
     Vector2 dnA = {(float)cx, (float)cy + s * 1.6f};
-    Vector2 dnB = {(float)cx - s, (float)cy + s * 0.2f};
-    Vector2 dnC = {(float)cx + s, (float)cy + s * 0.2f};
+    Vector2 dnB = {(float)cx + s, (float)cy + s * 0.2f};
+    Vector2 dnC = {(float)cx - s, (float)cy + s * 0.2f};
 
     Vector2 ltA = {(float)cx - s * 1.6f, (float)cy};
-    Vector2 ltB = {(float)cx - s * 0.2f, (float)cy - s};
-    Vector2 ltC = {(float)cx - s * 0.2f, (float)cy + s};
+    Vector2 ltB = {(float)cx - s * 0.2f, (float)cy + s};
+    Vector2 ltC = {(float)cx - s * 0.2f, (float)cy - s};
 
     Vector2 rtA = {(float)cx + s * 1.6f, (float)cy};
     Vector2 rtB = {(float)cx + s * 0.2f, (float)cy - s};
@@ -409,6 +409,8 @@ static EvalResult EvaluatePolicy(
     const float TURN_SPEED_BASE = 3.0f;
     const float TURN_SPEED_FACTOR = 0.3f;
     const double WALL_HIT_TERMINAL_SCORE_PENALTY = 5000.0;
+    const double STALL_TERMINAL_SCORE_PENALTY = 2500.0;
+    const double TIMEOUT_TERMINAL_SCORE_PENALTY = 1800.0;
 
 // Scoring weights (tune later if you want).
     const float FINISH_BONUS = 100000.0f;
@@ -459,6 +461,8 @@ static EvalResult EvaluatePolicy(
         int nextCheckpoint = startLapActive ? 1 : 0;
         bool raceFinished = false;
         int consecutiveWallHits = 0;
+        int stepsSinceCheckpoint = 0;
+        bool terminalStallEpisode = false;
 
         int wallHits = 0;
         int grassFrames = 0;
@@ -594,6 +598,7 @@ static EvalResult EvaluatePolicy(
                         if (allCrossed) {
                             cp.crossed = true;
                             currentLap++;
+                            stepsSinceCheckpoint = 0;
 
                             for (auto& c : checkpoints) c.crossed = false;
                             nextCheckpoint = 1;
@@ -611,6 +616,7 @@ static EvalResult EvaluatePolicy(
                     if (currentLap > 0 && nextCheckpoint != 0) {
                         cp.crossed = true;
                         nextCheckpoint = (nextCheckpoint + 1) % (int)checkpoints.size();
+                        stepsSinceCheckpoint = 0;
                     } else {
                         cp.crossed = false;
                     }
@@ -618,7 +624,13 @@ static EvalResult EvaluatePolicy(
             }
 
             steps++;
-            if (terminalWallHitEpisode) break;
+            stepsSinceCheckpoint++;
+            const int EVAL_MAX_STEPS_WITHOUT_CHECKPOINT = (wallHitDnfThreshold >= 3) ? 1000 :
+                                                          (wallHitDnfThreshold == 2) ? 850 : 700;
+            if (stepsSinceCheckpoint >= EVAL_MAX_STEPS_WITHOUT_CHECKPOINT) {
+                terminalStallEpisode = true;
+            }
+            if (terminalWallHitEpisode || terminalStallEpisode) break;
             state = GetState(trackImage, position, angle, speed);
         }
 
@@ -629,6 +641,12 @@ static EvalResult EvaluatePolicy(
         score -= (double)grassFrames * GRASS_PENALTY;
         if (terminalWallHitEpisode) {
             score -= WALL_HIT_TERMINAL_SCORE_PENALTY;
+        }
+        if (terminalStallEpisode) {
+            score -= STALL_TERMINAL_SCORE_PENALTY;
+        }
+        if (!raceFinished && steps >= max_steps) {
+            score -= TIMEOUT_TERMINAL_SCORE_PENALTY;
         }
 
         sumScore += score;
