@@ -888,9 +888,9 @@ int main(int argc, char* argv[]) {
                 return {"drive", 6.0e-4f, 1.00f, 0.015f, 0.996f, 0.10f, 0.0035f, 8.0f, 1.4f, 0.0075f, 100.0f, 850.0f, 320.0f, 3600.0f, 0.0f, 0.0f, 0.0f, 800.0f, 650.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, stricter collision tolerance.
-                return {"drive_strict", 8.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0040f, 10.0f, 1.6f, 0.0080f, 95.0f, 820.0f, 210.0f, 3400.0f, 0.0f, 0.0f, 0.0f, 760.0f, 620.0f};
+                return {"drive_strict", 8.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0036f, 11.0f, 1.8f, 0.0080f, 95.0f, 820.0f, 260.0f, 3500.0f, 0.0f, 0.0f, 0.0f, 740.0f, 640.0f};
             case CurriculumStage::Clean:
-                return {"clean", 6.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0045f, 12.0f, 2.0f, 0.0085f, 90.0f, 780.0f, 230.0f, 3200.0f, 0.0f, 0.0f, 0.0f, 700.0f, 580.0f};
+                return {"clean", 6.0e-4f, 0.35f, 0.030f, 0.997f, 0.10f, 0.0040f, 12.0f, 2.2f, 0.0085f, 90.0f, 780.0f, 300.0f, 3350.0f, 0.0f, 0.0f, 0.0f, 680.0f, 620.0f};
             case CurriculumStage::Pace:
                 return {"pace", 4.0e-4f, 0.20f, 0.010f, 0.998f, 0.11f, 0.0050f, 14.0f, 2.4f, 0.0090f, 85.0f, 740.0f, 220.0f, 3000.0f, 0.0f, 0.0012f, 0.15f, 680.0f, 540.0f};
             case CurriculumStage::Corner:
