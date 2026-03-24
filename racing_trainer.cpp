@@ -1894,7 +1894,7 @@ float epsilon = EPSILON_START;
                     }
                 } else if (curriculumStage == CurriculumStage::DriveStrict) {
                     // Stage 1b goal: strict race-drive behavior before clean stage.
-                    const double DRIVE_STRICT_MIN_FINISH_RATE = 0.60;
+                    const double DRIVE_STRICT_MIN_FINISH_RATE = 0.65;
                     const double DRIVE_STRICT_MAX_AVG_WALL_HITS = 0.15;
                     const double DRIVE_STRICT_MAX_AVG_STEPS_ALL = 2300.0;
                     const int DRIVE_STRICT_REQUIRED_STABLE_EVALS = 2;
