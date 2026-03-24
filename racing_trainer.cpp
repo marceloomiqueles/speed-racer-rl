@@ -1473,6 +1473,34 @@ float epsilon = EPSILON_START;
             float progress = prevDistToNextCP - distToNextCP;
             reward += progress * stageParams.progress_gain;
 
+            // Safe-speed shaping: punish high speed when forward space is short, reward pace when clear.
+            if (speed > 0.0f) {
+                const float FORWARD_LIDAR_RANGE = 200.0f;
+                float forwardClearance = CastLIDARRay(trackImage, position, angle, FORWARD_LIDAR_RANGE);
+                float clearanceNorm = std::clamp(forwardClearance / FORWARD_LIDAR_RANGE, 0.0f, 1.0f);
+                float speedNorm = std::clamp(fabs(speed) / MAX_SPEED, 0.0f, 1.0f);
+                float safeSpeedLimit = 0.25f + 0.75f * clearanceNorm;
+
+                float safeSpeedPenaltyGain = 0.0f;
+                float safeSpeedBonusGain = 0.0f;
+                if (curriculumMode == CurriculumMode::Auto) {
+                    if (curriculumStage == CurriculumStage::Drive) {
+                        safeSpeedPenaltyGain = 1.6f;
+                        safeSpeedBonusGain = 0.18f;
+                    } else if (curriculumStage == CurriculumStage::DriveStrict) {
+                        safeSpeedPenaltyGain = 2.0f;
+                        safeSpeedBonusGain = 0.15f;
+                    }
+                }
+
+                if (safeSpeedPenaltyGain > 0.0f && speedNorm > safeSpeedLimit) {
+                    reward -= (speedNorm - safeSpeedLimit) * safeSpeedPenaltyGain;
+                }
+                if (safeSpeedBonusGain > 0.0f && clearanceNorm > 0.70f && speedNorm > 0.45f && !hitWall) {
+                    reward += (speedNorm - 0.45f) * safeSpeedBonusGain;
+                }
+            }
+
             if (progress > 0.0f){
                 reward += fabs(speed) * DT * stageParams.speed_progress_gain;
             }
@@ -1496,7 +1524,7 @@ float epsilon = EPSILON_START;
             if (hitWall) {
                 float wallPenaltyScale = 1.0f;
                 if (epsilon <= 0.015f) {
-                    wallPenaltyScale = 2.3f;  // very strict consolidation
+                    wallPenaltyScale = 1.9f;  // strict but less destabilizing
                 } else if (epsilon <= 0.03f) {
                     wallPenaltyScale = 1.7f;  // strict consolidation
                 } else if (epsilon <= 0.20f) {

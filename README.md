@@ -187,6 +187,7 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 Each milestone now runs two evaluations with spawn jitter (position/angle): `greedy` (`eps=0.00`) and `semi-greedy` (`eps=0.02`), using `30` eval episodes per mode.
 Stage promotion and best-checkpoint gating use a conservative metric (worst-case between those two evals) to improve consistency.
 Reward shaping prioritizes completing the full 3-lap race: `finish_reward` and `lap_reward` are weighted above speed-only incentives.
+In `drive`/`drive_strict`, trainer also applies a forward-LIDAR safe-speed shaping term: it penalizes going too fast with short forward clearance and rewards pace when forward space is clear.
 A normalization layer enforces terminal dominance:
 - finished episodes receive an extra finish-dominance bonus
 - non-finish episodes are capped to prevent partial-reward accumulation from outscoring a finish
