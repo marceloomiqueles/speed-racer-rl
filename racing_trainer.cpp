@@ -391,6 +391,7 @@ static EvalResult EvaluateGreedy(
     const Vector2& spawnPosition,
     float spawnAngle,
     bool startLapActive,
+    int wallHitDnfThreshold,
     int evalEpisodes,
     int max_steps,
     float DT
@@ -401,7 +402,6 @@ static EvalResult EvaluateGreedy(
     const float FRICTION = 50.0f;
     const float TURN_SPEED_BASE = 3.0f;
     const float TURN_SPEED_FACTOR = 0.3f;
-    const bool TERMINATE_ON_WALL_HIT = true;
     const double WALL_HIT_TERMINAL_SCORE_PENALTY = 5000.0;
 
 // Scoring weights (tune later if you want).
@@ -536,14 +536,14 @@ static EvalResult EvaluateGreedy(
 
             if (hitWall) {
                 consecutiveWallHits++;
-                if (TERMINATE_ON_WALL_HIT) {
+                if (wallHitDnfThreshold > 0 && wallHits >= wallHitDnfThreshold) {
                     terminalWallHitEpisode = true;
                 }
             } else {
                 consecutiveWallHits = 0;
             }
 
-            if (!TERMINATE_ON_WALL_HIT && consecutiveWallHits >= 3) {
+            if (!terminalWallHitEpisode && wallHitDnfThreshold > 1 && consecutiveWallHits >= 3) {
                 Checkpoint& cpTarget = checkpoints[nextCheckpoint];
                 Vector2 cpMid = {
                     (cpTarget.start.x + cpTarget.end.x) * 0.5f,
@@ -845,7 +845,7 @@ int main(int argc, char* argv[]) {
             case CurriculumStage::Drive:
                 // Base stage (exploration): tolerate some wall contacts, prioritize progress.
                 // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 1.5f, 1.0f, 0.006f, 90.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 3.0f, 1.0f, 0.006f, 90.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, DNF on first wall hit.
                 return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 50.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f};
@@ -1438,6 +1438,11 @@ float epsilon = EPSILON_START;
 
             if (hitWall) {
                 reward -= stageParams.wall_hit_penalty;
+                // Progressive penalty in drive to discourage repeated wall contacts while
+                // still allowing exploration without immediate DNF.
+                if (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) {
+                    reward -= stageParams.wall_hit_penalty * 0.25f * (float)wallHitsThisEpisode;
+                }
                 if (terminalWallHit) {
                     reward -= stageParams.wall_hit_penalty * WALL_HIT_TERMINAL_MULTIPLIER;
                 }
@@ -1734,6 +1739,7 @@ float epsilon = EPSILON_START;
                 track.spawn_position,
                 track.spawn_angle,
                 (track.name != "sandbox"),
+                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 3 : 1,
                 EVAL_EPISODES,
                 EVAL_MAX_STEPS,
                 DT

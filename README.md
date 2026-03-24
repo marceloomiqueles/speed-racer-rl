@@ -185,7 +185,9 @@ Wall-hit DNF policy (training):
 - `drive_strict`: DNF after `3` wall hits
 - `clean`, `pace`, `corner`: DNF on first wall hit
 
-Greedy milestone evaluation remains strict: DNF on first wall hit.
+Greedy milestone evaluation wall-hit policy:
+- `drive`: DNF after `3` wall hits (more informative collision metrics in exploration stage)
+- `drive_strict`, `clean`, `pace`, `corner`: DNF on first wall hit
 
 Optional top-speed reward (off by default):
 
