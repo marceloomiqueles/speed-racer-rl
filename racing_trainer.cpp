@@ -849,7 +849,7 @@ int main(int argc, char* argv[]) {
                 // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
                 return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.12f, 0.0040f, 4.0f, 1.0f, 0.006f, 120.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f, 1200.0f, 400.0f};
             case CurriculumStage::DriveStrict:
-                // Pre-clean stage: race-drive discipline, DNF on first wall hit.
+                // Pre-clean stage: race-drive discipline, stricter collision tolerance.
                 return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 80.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
             case CurriculumStage::Clean:
                 return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0075f, 14.0f, 2.5f, 0.006f, 80.0f, 360.0f, 220.0f, 1200.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
@@ -1222,7 +1222,7 @@ float epsilon = EPSILON_START;
                     return 3;
                 }
                 if (curriculumStage == CurriculumStage::DriveStrict) {
-                    return 3;
+                    return 2;
                 }
             }
             return 1;
@@ -1752,7 +1752,7 @@ float epsilon = EPSILON_START;
                 track.spawn_angle,
                 (track.name != "sandbox"),
                 (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 3 :
-                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::DriveStrict) ? 3 : 1,
+                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::DriveStrict) ? 2 : 1,
                 EVAL_EPISODES,
                 EVAL_MAX_STEPS,
                 DT
@@ -1894,7 +1894,7 @@ float epsilon = EPSILON_START;
                     }
                 } else if (curriculumStage == CurriculumStage::DriveStrict) {
                     // Stage 1b goal: strict race-drive behavior before clean stage.
-                    const double DRIVE_STRICT_MIN_FINISH_RATE = 0.20;
+                    const double DRIVE_STRICT_MIN_FINISH_RATE = 0.60;
                     const double DRIVE_STRICT_MAX_AVG_WALL_HITS = 0.15;
                     const double DRIVE_STRICT_MAX_AVG_STEPS_ALL = 2300.0;
                     const int DRIVE_STRICT_REQUIRED_STABLE_EVALS = 2;
@@ -1911,8 +1911,8 @@ float epsilon = EPSILON_START;
                     }
                 } else if (curriculumStage == CurriculumStage::Clean) {
                     // Stage 2 goal: clean finishes, low collision rate.
-                    const double CLEAN_MIN_FINISH_RATE = 0.70;
-                    const double CLEAN_MAX_AVG_WALL_HITS = 0.50;
+                    const double CLEAN_MIN_FINISH_RATE = 0.90;
+                    const double CLEAN_MAX_AVG_WALL_HITS = 0.10;
                     const double CLEAN_MAX_AVG_STEPS_ALL = 2400.0;
                     if (eval.finish_rate >= CLEAN_MIN_FINISH_RATE &&
                         eval.avg_wall_hits <= CLEAN_MAX_AVG_WALL_HITS &&
