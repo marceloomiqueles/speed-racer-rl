@@ -844,7 +844,8 @@ int main(int argc, char* argv[]) {
         switch (stage) {
             case CurriculumStage::Drive:
                 // Base stage (exploration): tolerate some wall contacts, prioritize progress.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.10f, 0.0065f, 14.0f, 2.0f, 0.004f, 55.0f, 300.0f, 160.0f, 900.0f, 0.0f, 0.0f, 0.0f};
+                // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 8.0f, 1.5f, 0.006f, 90.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, DNF on first wall hit.
                 return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 50.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f};
