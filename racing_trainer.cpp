@@ -1255,6 +1255,7 @@ float epsilon = EPSILON_START;
         int consecutiveWallHits = 0;
         int wallHitsThisLap = 0;
         int wallHitsThisEpisode = 0;
+        int stepsSinceCheckpoint = 0;
         const int MAX_WALL_HITS_BEFORE_DNF = [&]() -> int {
             if (curriculumMode == CurriculumMode::Auto) {
                 if (curriculumStage == CurriculumStage::Drive) {
@@ -1267,6 +1268,15 @@ float epsilon = EPSILON_START;
             return 1;
         }();
         const float WALL_HIT_TERMINAL_MULTIPLIER = 5.0f;
+        const float STALL_TERMINAL_PENALTY_MULTIPLIER = 0.60f;
+        const float TIMEOUT_TERMINAL_PENALTY_MULTIPLIER = 0.80f;
+        const int MAX_STEPS_WITHOUT_CHECKPOINT = [&]() -> int {
+            if (curriculumMode == CurriculumMode::Auto) {
+                if (curriculumStage == CurriculumStage::Drive) return 1100;
+                if (curriculumStage == CurriculumStage::DriveStrict) return 900;
+            }
+            return 700;
+        }();
 
         int idleCounter = 0;
         const float V_IDLE = 8.0f;
@@ -1296,6 +1306,7 @@ float epsilon = EPSILON_START;
 
         while (!raceFinished && episode_steps < max_steps && !interrupted) {
             bool terminalWallHit = false;
+            bool terminalStall = false;
             if (ENABLE_RENDER && WindowShouldClose()) {
                 interrupted = 1;
                 break;
@@ -1530,6 +1541,7 @@ float epsilon = EPSILON_START;
                             reward += stageParams.checkpoint_reward;
                             currentLap++;
                             reward += stageParams.lap_reward;
+                            stepsSinceCheckpoint = 0;
                             if (lapWasClean) {
                                 reward += stageParams.clean_lap_bonus;
                             }
@@ -1581,6 +1593,7 @@ float epsilon = EPSILON_START;
                         cp.crossed = true;
                         reward += stageParams.checkpoint_reward;
                         nextCheckpoint = (nextCheckpoint + 1) % (int)checkpoints.size();
+                        stepsSinceCheckpoint = 0;
                     } else {
                         cp.crossed = false;
                     }
@@ -1592,12 +1605,23 @@ float epsilon = EPSILON_START;
                 if (finishLine.CheckCrossing(prevPosition, position)) reward -= 10.0f;
             }
 
+            stepsSinceCheckpoint++;
+            if (stepsSinceCheckpoint >= MAX_STEPS_WITHOUT_CHECKPOINT) {
+                terminalStall = true;
+            }
+
             std::vector<float> next_state = GetState(trackImage, position, angle, speed);
-            bool done = raceFinished || episode_steps >= max_steps || terminalWallHit;
+            bool timeoutStep = (episode_steps + 1 >= max_steps);
+            bool done = raceFinished || timeoutStep || terminalWallHit || terminalStall;
             if (done) {
                 if (raceFinished) {
                     reward += stageParams.finish_dominance_bonus;
                 } else {
+                    if (terminalStall) {
+                        reward -= stageParams.finish_reward * STALL_TERMINAL_PENALTY_MULTIPLIER;
+                    } else if (timeoutStep) {
+                        reward -= stageParams.finish_reward * TIMEOUT_TERMINAL_PENALTY_MULTIPLIER;
+                    }
                     float projectedNonFinish = episode_reward + reward;
                     if (projectedNonFinish > stageParams.non_finish_episode_cap) {
                         reward -= (projectedNonFinish - stageParams.non_finish_episode_cap);
