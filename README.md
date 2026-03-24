@@ -179,6 +179,9 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `clean` -> `pace` when consistency and pace are both good (`finish_rate >= 70%`, `avg_wall_hits <= 0.50`, and `avg_steps_all <= 2400`)
 - `pace` -> `corner` when finish pace improves consistently
 Reward shaping prioritizes completing the full 3-lap race: `finish_reward` and `lap_reward` are weighted above speed-only incentives.
+A normalization layer enforces terminal dominance:
+- finished episodes receive an extra finish-dominance bonus
+- non-finish episodes are capped to prevent partial-reward accumulation from outscoring a finish
 
 Wall-hit DNF policy (training):
 - `drive`: DNF after `30` wall hits (exploration stage)

@@ -839,24 +839,26 @@ int main(int argc, char* argv[]) {
         float corner_drive_bonus;
         float top_speed_reward_gain;
         float top_speed_peak_bonus;
+        float non_finish_episode_cap;
+        float finish_dominance_bonus;
     };
     auto get_stage_params = [&](CurriculumStage stage) -> StageParams {
         switch (stage) {
             case CurriculumStage::Drive:
                 // Base stage (exploration): tolerate some wall contacts, prioritize progress.
                 // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 3.0f, 1.0f, 0.006f, 90.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 3.0f, 1.0f, 0.006f, 90.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f, 1200.0f, 400.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, DNF on first wall hit.
-                return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 50.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f};
+                return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 50.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
             case CurriculumStage::Clean:
-                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0075f, 14.0f, 2.5f, 0.006f, 62.0f, 360.0f, 220.0f, 1200.0f, 0.0f, 0.0f, 0.0f};
+                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0075f, 14.0f, 2.5f, 0.006f, 62.0f, 360.0f, 220.0f, 1200.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
             case CurriculumStage::Pace:
-                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0085f, 16.0f, 3.0f, 0.010f, 55.0f, 420.0f, 180.0f, 1500.0f, 0.0f, 0.0015f, 0.20f};
+                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0085f, 16.0f, 3.0f, 0.010f, 55.0f, 420.0f, 180.0f, 1500.0f, 0.0f, 0.0015f, 0.20f, 1000.0f, 350.0f};
             case CurriculumStage::Corner:
-                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0095f, 16.0f, 3.0f, 0.012f, 55.0f, 450.0f, 160.0f, 1700.0f, 0.004f, 0.0020f, 0.25f};
+                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0095f, 16.0f, 3.0f, 0.012f, 55.0f, 450.0f, 160.0f, 1700.0f, 0.004f, 0.0020f, 0.25f, 1000.0f, 350.0f};
         }
-        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f};
+        return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f, 800.0f, 250.0f};
     };
     CurriculumStage curriculumStage = CurriculumStage::Drive;
     int curriculumStableEvals = 0;
@@ -1238,7 +1240,7 @@ float epsilon = EPSILON_START;
         const float STUCK_BREAK_PENALTY = 50.0f;
         StageParams stageParams = (curriculumMode == CurriculumMode::Auto)
             ? get_stage_params(curriculumStage)
-            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 20.0f, 2.0f, 0.010f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f};
+            : StageParams{"manual", dqn.get_learning_rate(), EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 20.0f, 2.0f, 0.010f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f, 800.0f, 250.0f};
 
         std::vector<float> state = GetState(trackImage, position, angle, speed);
         std::vector<TraceSample> trace;
@@ -1544,11 +1546,21 @@ float epsilon = EPSILON_START;
                 if (finishLine.CheckCrossing(prevPosition, position)) reward -= 10.0f;
             }
 
-            episode_reward += reward;
-            episode_steps++;
-
             std::vector<float> next_state = GetState(trackImage, position, angle, speed);
             bool done = raceFinished || episode_steps >= max_steps || terminalWallHit;
+            if (done) {
+                if (raceFinished) {
+                    reward += stageParams.finish_dominance_bonus;
+                } else {
+                    float projectedNonFinish = episode_reward + reward;
+                    if (projectedNonFinish > stageParams.non_finish_episode_cap) {
+                        reward -= (projectedNonFinish - stageParams.non_finish_episode_cap);
+                    }
+                }
+            }
+
+            episode_reward += reward;
+            episode_steps++;
 
             replay_buffer.add(state, action, reward, next_state, done);
 
