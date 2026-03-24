@@ -72,16 +72,16 @@ static const char* ActionLabel(int action) {
     }
 }
 
-static void DrawControlTriangles(int cx, int cy, float s, int action) {
+static void DrawControlTriangles(int cx, int cy, float s, float accelerationInput, float steeringInput) {
     const Color outline = BLACK;
     const Color noFill = BLANK;
-    const bool forwardActive = (action == 0 || action == 4 || action == 5);
-    const bool reverseActive = (action == 1);
-    const bool leftActive = (action == 2 || action == 4);
-    const bool rightActive = (action == 3 || action == 5);
+    const bool forwardActive = (accelerationInput > 0.1f);
+    const bool reverseActive = (accelerationInput < -0.1f);
+    const bool leftActive = (steeringInput < -0.1f);
+    const bool rightActive = (steeringInput > 0.1f);
     const Color forwardFill = forwardActive ? GREEN : noFill;
     const Color reverseFill = reverseActive ? RED : noFill;
-    const Color leftFill = leftActive ? YELLOW : noFill;
+    const Color leftFill = leftActive ? SKYBLUE : noFill;
     const Color rightFill = rightActive ? YELLOW : noFill;
 
     Vector2 upA = {(float)cx, (float)cy - s * 1.6f};
@@ -117,7 +117,7 @@ static void DrawControlTriangles(int cx, int cy, float s, int action) {
     draw_outline(rtA, rtB, rtC);
 }
 
-static void DrawControlPadTopRight(int screenWidth, int action) {
+static void DrawControlPadTopRight(int screenWidth, float accelerationInput, float steeringInput) {
     const int margin = 16;
     const int boxW = 110;
     const int boxH = 110;
@@ -129,7 +129,7 @@ static void DrawControlPadTopRight(int screenWidth, int action) {
 
     const int cx = x + boxW / 2;
     const int cy = y + boxH / 2;
-    DrawControlTriangles(cx, cy, 18.0f, action);
+    DrawControlTriangles(cx, cy, 18.0f, accelerationInput, steeringInput);
 }
 
 enum class TraceState : unsigned char {
@@ -847,12 +847,12 @@ int main(int argc, char* argv[]) {
             case CurriculumStage::Drive:
                 // Base stage (exploration): tolerate some wall contacts, prioritize progress.
                 // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 3.0f, 1.0f, 0.006f, 90.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f, 1200.0f, 400.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.12f, 0.0040f, 3.0f, 1.0f, 0.006f, 120.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f, 1200.0f, 400.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, DNF on first wall hit.
-                return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 50.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
+                return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 80.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
             case CurriculumStage::Clean:
-                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0075f, 14.0f, 2.5f, 0.006f, 62.0f, 360.0f, 220.0f, 1200.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
+                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0075f, 14.0f, 2.5f, 0.006f, 80.0f, 360.0f, 220.0f, 1200.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
             case CurriculumStage::Pace:
                 return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0085f, 16.0f, 3.0f, 0.010f, 55.0f, 420.0f, 180.0f, 1500.0f, 0.0f, 0.0015f, 0.20f, 1000.0f, 350.0f};
             case CurriculumStage::Corner:
@@ -1219,7 +1219,7 @@ float epsilon = EPSILON_START;
         const int MAX_WALL_HITS_BEFORE_DNF = [&]() -> int {
             if (curriculumMode == CurriculumMode::Auto) {
                 if (curriculumStage == CurriculumStage::Drive) {
-                    return 30;
+                    return 6;
                 }
                 if (curriculumStage == CurriculumStage::DriveStrict) {
                     return 3;
@@ -1653,7 +1653,7 @@ float epsilon = EPSILON_START;
                 DrawText(TextFormat("Epsilon: %.4f", epsilon), 10, 112, 18, DARKGRAY);
                 DrawText(TextFormat("TopSpeed: %.1f", episodeTopSpeed), 10, 132, 18, DARKGRAY);
                 DrawText(aiRecordText.c_str(), 10, 152, 18, DARKGREEN);
-                DrawControlPadTopRight(track.screen_width, action);
+                DrawControlPadTopRight(track.screen_width, accelerationInput, steeringInput);
                 DrawText("Trainer Render Mode (L: lidar, ESC to stop training)", 10, track.screen_height - 28, 16, MAROON);
                 EndDrawing();
             }
@@ -1751,7 +1751,7 @@ float epsilon = EPSILON_START;
                 track.spawn_position,
                 track.spawn_angle,
                 (track.name != "sandbox"),
-                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 30 :
+                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 6 :
                 (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::DriveStrict) ? 3 : 1,
                 EVAL_EPISODES,
                 EVAL_MAX_STEPS,
