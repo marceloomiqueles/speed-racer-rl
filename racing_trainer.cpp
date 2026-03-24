@@ -885,7 +885,7 @@ int main(int argc, char* argv[]) {
         switch (stage) {
             case CurriculumStage::Drive:
                 // Priority order: finish race (3 laps) > finish lap > next checkpoint.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.10f, 0.0035f, 8.0f, 1.4f, 0.0075f, 100.0f, 850.0f, 220.0f, 3600.0f, 0.0f, 0.0f, 0.0f, 800.0f, 650.0f};
+                return {"drive", 8.0e-4f, 1.00f, 0.015f, 0.996f, 0.10f, 0.0035f, 8.0f, 1.4f, 0.0075f, 100.0f, 850.0f, 220.0f, 3600.0f, 0.0f, 0.0f, 0.0f, 800.0f, 650.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, stricter collision tolerance.
                 return {"drive_strict", 8.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0040f, 10.0f, 1.6f, 0.0080f, 95.0f, 820.0f, 210.0f, 3400.0f, 0.0f, 0.0f, 0.0f, 760.0f, 620.0f};
@@ -1134,7 +1134,7 @@ float epsilon = EPSILON_START;
     double best_time_avg_steps_finish = 1e18;
     double best_score = -1e18;
 
-    const int EVAL_EPISODES = 20;
+    const int EVAL_EPISODES = 30;
     const int FINISH_RATE_MIN_IMPROVEMENT = 2;
     const double SCORE_MIN_IMPROVEMENT = 500.0;
 
@@ -1489,8 +1489,10 @@ float epsilon = EPSILON_START;
 
             if (hitWall) {
                 float wallPenaltyScale = 1.0f;
-                if (epsilon <= 0.08f) {
-                    wallPenaltyScale = 1.6f;  // strict consolidation
+                if (epsilon <= 0.015f) {
+                    wallPenaltyScale = 2.0f;  // very strict consolidation
+                } else if (epsilon <= 0.03f) {
+                    wallPenaltyScale = 1.7f;  // strict consolidation
                 } else if (epsilon <= 0.20f) {
                     wallPenaltyScale = 1.3f;  // transition phase
                 }
