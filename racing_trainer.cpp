@@ -1496,7 +1496,7 @@ float epsilon = EPSILON_START;
             if (hitWall) {
                 float wallPenaltyScale = 1.0f;
                 if (epsilon <= 0.015f) {
-                    wallPenaltyScale = 2.0f;  // very strict consolidation
+                    wallPenaltyScale = 2.3f;  // very strict consolidation
                 } else if (epsilon <= 0.03f) {
                     wallPenaltyScale = 1.7f;  // strict consolidation
                 } else if (epsilon <= 0.20f) {
@@ -2015,7 +2015,7 @@ float epsilon = EPSILON_START;
 
                 if (curriculumStage == CurriculumStage::Drive) {
                     // Stage 1 goal: exploration drive with progress and controlled collisions.
-                    const double DRIVE_MAX_AVG_WALL_HITS = 0.80;
+                    const double DRIVE_MAX_AVG_WALL_HITS = 0.70;
                     const double DRIVE_MIN_LAP_GT1_RATE = 0.20;
                     const double DRIVE_MAX_AVG_STEPS_ALL = 2600.0;
                     const int DRIVE_REQUIRED_STABLE_EVALS = 4;
