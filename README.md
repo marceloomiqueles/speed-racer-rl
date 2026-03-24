@@ -174,12 +174,12 @@ To enable automatic curriculum stages:
 ```
 
 Curriculum stages (`auto`) advance on milestone evaluations:
-- `drive` -> `clean` when driving is safe and race-oriented (`avg_wall_hits <= 0.80`, `lap_gt1_rate >= 20%`, and `avg_steps_all <= 2600`)
+- `drive` -> `clean` when driving is safe and race-oriented (`avg_wall_hits <= 0.80`, `lap_gt1_rate >= 20%`, and `avg_steps_all <= 2600`) for `4` consecutive evals
 - `clean` -> `pace` when consistency and pace are both good (`finish_rate >= 70%`, `avg_wall_hits <= 0.50`, and `avg_steps_all <= 2400`)
 - `pace` -> `corner` when finish pace improves consistently
 
 Wall-hit DNF policy (training):
-- `drive`: DNF after `2` wall hits (slightly more exploration tolerance)
+- `drive`: DNF after `6` wall hits (exploration tolerance in early stage)
 - `clean`, `pace`, `corner`: DNF on first wall hit
 
 Greedy milestone evaluation remains strict: DNF on first wall hit.

@@ -843,7 +843,7 @@ int main(int argc, char* argv[]) {
         switch (stage) {
             case CurriculumStage::Drive:
                 // Base stage: prioritize stability/no-collision before speed.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f, 0.0f, 0.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Clean:
                 return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 62.0f, 300.0f, 220.0f, 550.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Pace:
@@ -930,6 +930,7 @@ int main(int argc, char* argv[]) {
     fs::path trackProfileDir = trackModelDirLegacy / profileStorageKey;
     fs::path trackBestTimePath = trackProfileDir / "best_time.pt";
     fs::path trackStatePath = trackProfileDir / "training_state.txt";
+    fs::path trackEvalHistoryPath = trackProfileDir / "eval_history.csv";
     fs::path externalModelsRoot = fs::path("..") / "trainedModels";
     fs::path externalTrackModelDirLegacy = externalModelsRoot / track.name;
     fs::path externalTrackProfileDir = externalTrackModelDirLegacy / profileStorageKey;
@@ -1209,7 +1210,7 @@ float epsilon = EPSILON_START;
         int wallHitsThisLap = 0;
         int wallHitsThisEpisode = 0;
         const int MAX_WALL_HITS_BEFORE_DNF =
-            (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 2 : 1;
+            (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 6 : 1;
         const float WALL_HIT_TERMINAL_MULTIPLIER = 4.0f;
 
         int idleCounter = 0;
@@ -1740,6 +1741,36 @@ float epsilon = EPSILON_START;
                         << " | avg_score=" << std::fixed << std::setprecision(1) << eval.avg_score
                         << "\n\n";
 
+            {
+                bool writeHeader = !fs::exists(trackEvalHistoryPath);
+                std::ofstream evalHistory(trackEvalHistoryPath, std::ios::app);
+                if (!evalHistory.is_open()) {
+                    std::cerr << "Warning: failed to open eval history file: "
+                              << trackEvalHistoryPath.string() << "\n";
+                } else {
+                    if (writeHeader) {
+                        evalHistory << "timestamp_utc,episode,stage,finishes,eval_episodes,finish_rate,"
+                                    << "avg_laps,lap_gt1_rate,avg_steps_all,avg_steps_finish,"
+                                    << "avg_wall_hits,avg_grass_frames,avg_score,epsilon,learning_rate\n";
+                    }
+                    evalHistory << NowUtcIso8601() << ","
+                                << episode << ","
+                                << ((curriculumMode == CurriculumMode::Auto) ? stage_to_string(curriculumStage) : "manual") << ","
+                                << eval.finishes << ","
+                                << eval.episodes << ","
+                                << std::fixed << std::setprecision(6) << eval.finish_rate << ","
+                                << std::fixed << std::setprecision(6) << eval.avg_laps << ","
+                                << std::fixed << std::setprecision(6) << eval.lap_gt1_rate << ","
+                                << std::fixed << std::setprecision(6) << eval.avg_steps_all << ","
+                                << std::fixed << std::setprecision(6) << eval.avg_steps_finish << ","
+                                << std::fixed << std::setprecision(6) << eval.avg_wall_hits << ","
+                                << std::fixed << std::setprecision(6) << eval.avg_grass_frames << ","
+                                << std::fixed << std::setprecision(6) << eval.avg_score << ","
+                                << std::fixed << std::setprecision(6) << epsilon << ","
+                                << std::scientific << dqn.get_learning_rate() << "\n";
+                }
+            }
+
             bool save_finish_rate = false;
             int best_finishes_int = (int)std::round(best_finish_rate * (double)EVAL_EPISODES);
             if (best_finish_rate < 0.0) {
@@ -1816,6 +1847,7 @@ float epsilon = EPSILON_START;
                     const double DRIVE_MAX_AVG_WALL_HITS = 0.80;
                     const double DRIVE_MIN_LAP_GT1_RATE = 0.20;
                     const double DRIVE_MAX_AVG_STEPS_ALL = 2600.0;
+                    const int DRIVE_REQUIRED_STABLE_EVALS = 4;
                     if (eval.avg_wall_hits <= DRIVE_MAX_AVG_WALL_HITS &&
                         eval.lap_gt1_rate >= DRIVE_MIN_LAP_GT1_RATE &&
                         eval.avg_steps_all <= DRIVE_MAX_AVG_STEPS_ALL) {
@@ -1823,7 +1855,7 @@ float epsilon = EPSILON_START;
                     } else {
                         curriculumStableEvals = 0;
                     }
-                    if (curriculumStableEvals >= 2) {
+                    if (curriculumStableEvals >= DRIVE_REQUIRED_STABLE_EVALS) {
                         promote = true;
                         nextStage = CurriculumStage::Clean;
                     }
