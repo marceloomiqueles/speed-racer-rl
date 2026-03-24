@@ -1804,7 +1804,12 @@ float epsilon = EPSILON_START;
                     }
                 } else if (curriculumStage == CurriculumStage::Clean) {
                     // Stage 2 goal: clean finishes, low collision rate.
-                    if (eval.finish_rate >= 0.70 && eval.avg_wall_hits <= 0.50) {
+                    const double CLEAN_MIN_FINISH_RATE = 0.70;
+                    const double CLEAN_MAX_AVG_WALL_HITS = 0.50;
+                    const double CLEAN_MAX_AVG_STEPS_ALL = 2400.0;
+                    if (eval.finish_rate >= CLEAN_MIN_FINISH_RATE &&
+                        eval.avg_wall_hits <= CLEAN_MAX_AVG_WALL_HITS &&
+                        eval.avg_steps_all <= CLEAN_MAX_AVG_STEPS_ALL) {
                         curriculumStableEvals++;
                     } else {
                         curriculumStableEvals = 0;
