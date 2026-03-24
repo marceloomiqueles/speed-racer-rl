@@ -180,8 +180,9 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `pace` -> `corner` when finish pace improves consistently
 
 Wall-hit DNF policy (training):
-- `drive`: DNF after `3` wall hits (exploration tolerance in early stage)
-- `drive_strict`, `clean`, `pace`, `corner`: DNF on first wall hit
+- `drive`: no DNF by wall hit (exploration stage)
+- `drive_strict`: DNF after `3` wall hits
+- `clean`, `pace`, `corner`: DNF on first wall hit
 
 Greedy milestone evaluation remains strict: DNF on first wall hit.
 

@@ -1213,8 +1213,17 @@ float epsilon = EPSILON_START;
         int consecutiveWallHits = 0;
         int wallHitsThisLap = 0;
         int wallHitsThisEpisode = 0;
-        const int MAX_WALL_HITS_BEFORE_DNF =
-            (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 3 : 1;
+        const int MAX_WALL_HITS_BEFORE_DNF = [&]() -> int {
+            if (curriculumMode == CurriculumMode::Auto) {
+                if (curriculumStage == CurriculumStage::Drive) {
+                    return 1000000000; // no DNF by wall-hit in exploration drive.
+                }
+                if (curriculumStage == CurriculumStage::DriveStrict) {
+                    return 3;
+                }
+            }
+            return 1;
+        }();
         const float WALL_HIT_TERMINAL_MULTIPLIER = 4.0f;
 
         int idleCounter = 0;
