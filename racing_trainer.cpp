@@ -371,6 +371,7 @@ struct EvalResult {
     double finish_rate = 0.0; // finishes / episodes.
 
     double avg_laps = 0.0;
+    double lap_gt1_rate = 0.0; // fraction of eval episodes with currentLap > 1.
 
     double avg_steps_finish = 0.0; // among finished episodes.
     double avg_steps_all = 0.0; // all episodes.
@@ -416,6 +417,7 @@ static EvalResult EvaluateGreedy(
     long long sumStepsAll = 0;
 
     int finishedCount = 0;
+    int lapGt1Count = 0;
     long long sumStepsFinished = 0;
 
     long long sumWallHits = 0;
@@ -609,12 +611,16 @@ static EvalResult EvaluateGreedy(
             finishedCount++;
             sumStepsFinished += steps;
         }
+        if (currentLap > 1) {
+            lapGt1Count++;
+        }
     }
 
     out.finishes = finishedCount;
     out.finish_rate = (evalEpisodes > 0) ? ((double)finishedCount / (double)evalEpisodes) : 0.0;
 
     out.avg_laps = (evalEpisodes > 0) ? ((double)sumLaps / (double)evalEpisodes) : 0.0;
+    out.lap_gt1_rate = (evalEpisodes > 0) ? ((double)lapGt1Count / (double)evalEpisodes) : 0.0;
 
     out.avg_steps_all = (evalEpisodes > 0) ? ((double)sumStepsAll / (double)evalEpisodes) : 0.0;
     out.avg_steps_finish = (finishedCount > 0) ? ((double)sumStepsFinished / (double)finishedCount) : 0.0;
@@ -1701,6 +1707,7 @@ float epsilon = EPSILON_START;
                         << " | finishes=" << eval.finishes << "/" << eval.episodes
                         << " (" << std::fixed << std::setprecision(1) << (eval.finish_rate * 100.0) << "%)"
                         << " | avg_laps=" << std::fixed << std::setprecision(2) << eval.avg_laps
+                        << " | lap_gt1_rate=" << std::fixed << std::setprecision(1) << (eval.lap_gt1_rate * 100.0) << "%"
                         << " | avg_steps_finish=" << std::fixed << std::setprecision(1) << eval.avg_steps_finish
                         << " | avg_wall_hits=" << std::fixed << std::setprecision(2) << eval.avg_wall_hits
                         << " | avg_grass_frames=" << std::fixed << std::setprecision(1) << eval.avg_grass_frames
@@ -1780,7 +1787,10 @@ float epsilon = EPSILON_START;
 
                 if (curriculumStage == CurriculumStage::Drive) {
                     // Stage 1 goal: drive safely first (low collisions), then move to clean stage.
-                    if (eval.avg_wall_hits <= 0.80) {
+                    const double DRIVE_MAX_AVG_WALL_HITS = 0.80;
+                    const double DRIVE_MIN_LAP_GT1_RATE = 0.20;
+                    if (eval.avg_wall_hits <= DRIVE_MAX_AVG_WALL_HITS &&
+                        eval.lap_gt1_rate >= DRIVE_MIN_LAP_GT1_RATE) {
                         curriculumStableEvals++;
                     } else {
                         curriculumStableEvals = 0;
