@@ -1219,7 +1219,7 @@ float epsilon = EPSILON_START;
         const int MAX_WALL_HITS_BEFORE_DNF = [&]() -> int {
             if (curriculumMode == CurriculumMode::Auto) {
                 if (curriculumStage == CurriculumStage::Drive) {
-                    return 6;
+                    return 3;
                 }
                 if (curriculumStage == CurriculumStage::DriveStrict) {
                     return 3;
@@ -1751,7 +1751,7 @@ float epsilon = EPSILON_START;
                 track.spawn_position,
                 track.spawn_angle,
                 (track.name != "sandbox"),
-                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 6 :
+                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 3 :
                 (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::DriveStrict) ? 3 : 1,
                 EVAL_EPISODES,
                 EVAL_MAX_STEPS,

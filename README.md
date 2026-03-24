@@ -184,12 +184,12 @@ A normalization layer enforces terminal dominance:
 - non-finish episodes are capped to prevent partial-reward accumulation from outscoring a finish
 
 Wall-hit DNF policy (training):
-- `drive`: DNF after `6` wall hits (exploration stage)
+- `drive`: DNF after `3` wall hits (exploration stage)
 - `drive_strict`: DNF after `3` wall hits
 - `clean`, `pace`, `corner`: DNF on first wall hit
 
 Greedy milestone evaluation wall-hit policy:
-- `drive`: DNF after `6` wall hits
+- `drive`: DNF after `3` wall hits
 - `drive_strict`: DNF after `3` wall hits
 - `drive_strict`, `clean`, `pace`, `corner`: DNF on first wall hit
 
