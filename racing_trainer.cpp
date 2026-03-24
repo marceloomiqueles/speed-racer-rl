@@ -384,7 +384,7 @@ struct EvalResult {
 
 // Greedy evaluation (epsilon=0) – used for best-model selection.
 // IMPORTANT: action mapping MUST match training (case 1 is reverse, no braking hack).
-static EvalResult EvaluateGreedy(
+static EvalResult EvaluatePolicy(
     DQN& dqn,
     const Image& trackImage,
     const std::vector<Checkpoint>& checkpointsTemplate,
@@ -394,7 +394,10 @@ static EvalResult EvaluateGreedy(
     int wallHitDnfThreshold,
     int evalEpisodes,
     int max_steps,
-    float DT
+    float DT,
+    float evalEpsilon,
+    float spawnPosJitterPx,
+    float spawnAngleJitterDeg
 ) {
 // Physics constants (must match training).
     const float MAX_SPEED = 300.0f;
@@ -431,9 +434,21 @@ static EvalResult EvaluateGreedy(
         std::vector<Checkpoint> checkpoints = checkpointsTemplate;
         for (auto& cp : checkpoints) cp.crossed = false;
 
+        auto unitRand = []() -> float {
+            return (float)rand() / (float)RAND_MAX;
+        };
+
         Vector2 position = spawnPosition;
+        if (spawnPosJitterPx > 0.0f) {
+            position.x += (unitRand() * 2.0f - 1.0f) * spawnPosJitterPx;
+            position.y += (unitRand() * 2.0f - 1.0f) * spawnPosJitterPx;
+        }
         Vector2 velocity = {0, 0};
         float angle = spawnAngle;
+        if (spawnAngleJitterDeg > 0.0f) {
+            const float kDegToRad = 3.14159265358979323846f / 180.0f;
+            angle += (unitRand() * 2.0f - 1.0f) * spawnAngleJitterDeg * kDegToRad;
+        }
         float speed = 0.0f;
 
         int currentLap = startLapActive ? 1 : -1;
@@ -454,6 +469,9 @@ static EvalResult EvaluateGreedy(
 
             auto q_values = dqn.predict(state);
             int action = (int)(std::max_element(q_values.begin(), q_values.end()) - q_values.begin());
+            if (evalEpsilon > 0.0f && unitRand() < evalEpsilon) {
+                action = rand() % 7;
+            }
 
             float accelerationInput = 0.0f;
             float steeringInput = 0.0f;
@@ -1750,8 +1768,11 @@ float epsilon = EPSILON_START;
             stats_file.close();
 
             const int EVAL_MAX_STEPS = max_steps;
+            const float EVAL_SPAWN_JITTER_PX = 6.0f;
+            const float EVAL_SPAWN_JITTER_DEG = 4.0f;
+            const float EVAL_SEMI_EPSILON = 0.02f;
 
-            auto eval = EvaluateGreedy(
+            auto evalGreedy = EvaluatePolicy(
                 dqn,
                 trackImage,
                 checkpointsTemplate,
@@ -1762,14 +1783,69 @@ float epsilon = EPSILON_START;
                 (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::DriveStrict) ? 2 : 1,
                 EVAL_EPISODES,
                 EVAL_MAX_STEPS,
-                DT
+                DT,
+                0.0f,
+                EVAL_SPAWN_JITTER_PX,
+                EVAL_SPAWN_JITTER_DEG
             );
+            auto evalSemi = EvaluatePolicy(
+                dqn,
+                trackImage,
+                checkpointsTemplate,
+                track.spawn_position,
+                track.spawn_angle,
+                (track.name != "sandbox"),
+                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 3 :
+                (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::DriveStrict) ? 2 : 1,
+                EVAL_EPISODES,
+                EVAL_MAX_STEPS,
+                DT,
+                EVAL_SEMI_EPSILON,
+                EVAL_SPAWN_JITTER_PX,
+                EVAL_SPAWN_JITTER_DEG
+            );
+            EvalResult eval = evalGreedy;
+            eval.finishes = std::min(evalGreedy.finishes, evalSemi.finishes);
+            eval.finish_rate = std::min(evalGreedy.finish_rate, evalSemi.finish_rate);
+            eval.avg_laps = std::min(evalGreedy.avg_laps, evalSemi.avg_laps);
+            eval.lap_gt1_rate = std::min(evalGreedy.lap_gt1_rate, evalSemi.lap_gt1_rate);
+            eval.avg_steps_all = std::max(evalGreedy.avg_steps_all, evalSemi.avg_steps_all);
+            if (evalGreedy.finishes > 0 && evalSemi.finishes > 0) {
+                eval.avg_steps_finish = std::max(evalGreedy.avg_steps_finish, evalSemi.avg_steps_finish);
+            } else {
+                eval.avg_steps_finish = 0.0;
+            }
+            eval.avg_wall_hits = std::max(evalGreedy.avg_wall_hits, evalSemi.avg_wall_hits);
+            eval.avg_grass_frames = std::max(evalGreedy.avg_grass_frames, evalSemi.avg_grass_frames);
+            eval.avg_score = std::min(evalGreedy.avg_score, evalSemi.avg_score);
             dqn.set_training_mode(true);
 
             std::cout << "\n✓ Milestone " << episode << " saved!\n";
             std::cout << "  Model: " << model_path << "\n";
             std::cout << "  Stats: " << stats_path << "\n";
-            std::cout << "  Eval (greedy, " << EVAL_EPISODES << " eps)"
+            std::cout << "  Eval (greedy eps=0.00, " << EVAL_EPISODES << " eps)"
+                        << " | finishes=" << evalGreedy.finishes << "/" << evalGreedy.episodes
+                        << " (" << std::fixed << std::setprecision(1) << (evalGreedy.finish_rate * 100.0) << "%)"
+                        << " | avg_laps=" << std::fixed << std::setprecision(2) << evalGreedy.avg_laps
+                        << " | lap_gt1_rate=" << std::fixed << std::setprecision(1) << (evalGreedy.lap_gt1_rate * 100.0) << "%"
+                        << " | avg_steps_all=" << std::fixed << std::setprecision(1) << evalGreedy.avg_steps_all
+                        << " | avg_steps_finish=" << std::fixed << std::setprecision(1) << evalGreedy.avg_steps_finish
+                        << " | avg_wall_hits=" << std::fixed << std::setprecision(2) << evalGreedy.avg_wall_hits
+                        << " | avg_grass_frames=" << std::fixed << std::setprecision(1) << evalGreedy.avg_grass_frames
+                        << " | avg_score=" << std::fixed << std::setprecision(1) << evalGreedy.avg_score
+                        << "\n";
+            std::cout << "  Eval (semi   eps=0.02, " << EVAL_EPISODES << " eps)"
+                        << " | finishes=" << evalSemi.finishes << "/" << evalSemi.episodes
+                        << " (" << std::fixed << std::setprecision(1) << (evalSemi.finish_rate * 100.0) << "%)"
+                        << " | avg_laps=" << std::fixed << std::setprecision(2) << evalSemi.avg_laps
+                        << " | lap_gt1_rate=" << std::fixed << std::setprecision(1) << (evalSemi.lap_gt1_rate * 100.0) << "%"
+                        << " | avg_steps_all=" << std::fixed << std::setprecision(1) << evalSemi.avg_steps_all
+                        << " | avg_steps_finish=" << std::fixed << std::setprecision(1) << evalSemi.avg_steps_finish
+                        << " | avg_wall_hits=" << std::fixed << std::setprecision(2) << evalSemi.avg_wall_hits
+                        << " | avg_grass_frames=" << std::fixed << std::setprecision(1) << evalSemi.avg_grass_frames
+                        << " | avg_score=" << std::fixed << std::setprecision(1) << evalSemi.avg_score
+                        << "\n";
+            std::cout << "  Eval gate (conservative: worst of greedy/semi)"
                         << " | finishes=" << eval.finishes << "/" << eval.episodes
                         << " (" << std::fixed << std::setprecision(1) << (eval.finish_rate * 100.0) << "%)"
                         << " | avg_laps=" << std::fixed << std::setprecision(2) << eval.avg_laps
@@ -1791,7 +1867,8 @@ float epsilon = EPSILON_START;
                     if (writeHeader) {
                         evalHistory << "timestamp_utc,episode,stage,finishes,eval_episodes,finish_rate,"
                                     << "avg_laps,lap_gt1_rate,avg_steps_all,avg_steps_finish,"
-                                    << "avg_wall_hits,avg_grass_frames,avg_score,epsilon,learning_rate\n";
+                                    << "avg_wall_hits,avg_grass_frames,avg_score,epsilon,learning_rate,"
+                                    << "greedy_finish_rate,semi_finish_rate\n";
                     }
                     evalHistory << NowUtcIso8601() << ","
                                 << episode << ","
@@ -1807,7 +1884,9 @@ float epsilon = EPSILON_START;
                                 << std::fixed << std::setprecision(6) << eval.avg_grass_frames << ","
                                 << std::fixed << std::setprecision(6) << eval.avg_score << ","
                                 << std::fixed << std::setprecision(6) << epsilon << ","
-                                << std::scientific << dqn.get_learning_rate() << "\n";
+                                << std::scientific << dqn.get_learning_rate() << ","
+                                << std::fixed << std::setprecision(6) << evalGreedy.finish_rate << ","
+                                << std::fixed << std::setprecision(6) << evalSemi.finish_rate << "\n";
                 }
             }
 

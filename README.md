@@ -178,6 +178,8 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `drive_strict` -> `clean` when it starts finishing races with strict wall discipline (`finish_rate >= 65%`, `avg_wall_hits <= 0.15`, and `avg_steps_all <= 2300`) for `2` consecutive evals
 - `clean` -> `pace` when consistency is championship-level (`finish_rate >= 90%`, `avg_wall_hits <= 0.10`, and `avg_steps_all <= 2400`) for `2` consecutive evals
 - `pace` -> `corner` when finish pace improves consistently (>= 3% vs pace-entry baseline, with `finish_rate >= 70%`)
+Each milestone now runs two evaluations with spawn jitter (position/angle): `greedy` (`eps=0.00`) and `semi-greedy` (`eps=0.02`).
+Stage promotion and best-checkpoint gating use a conservative metric (worst-case between those two evals) to improve consistency.
 Reward shaping prioritizes completing the full 3-lap race: `finish_reward` and `lap_reward` are weighted above speed-only incentives.
 A normalization layer enforces terminal dominance:
 - finished episodes receive an extra finish-dominance bonus
