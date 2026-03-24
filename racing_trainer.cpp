@@ -1932,7 +1932,7 @@ float epsilon = EPSILON_START;
                             curriculumStageEntryBestSteps = eval.avg_steps_finish;
                         }
                         if (eval.finish_rate >= 0.70 &&
-                            eval.avg_steps_finish <= curriculumStageEntryBestSteps * 0.95) {
+                            eval.avg_steps_finish <= curriculumStageEntryBestSteps * 0.97) {
                             curriculumStableEvals++;
                         } else {
                             curriculumStableEvals = 0;
