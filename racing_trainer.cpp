@@ -74,15 +74,18 @@ static const char* ActionLabel(int action) {
 
 static void DrawControlTriangles(int cx, int cy, float s, float accelerationInput, float steeringInput) {
     const Color outline = BLACK;
-    const Color noFill = BLANK;
     const bool forwardActive = (accelerationInput > 0.1f);
     const bool reverseActive = (accelerationInput < -0.1f);
     const bool leftActive = (steeringInput < -0.1f);
     const bool rightActive = (steeringInput > 0.1f);
-    const Color forwardFill = forwardActive ? GREEN : noFill;
-    const Color reverseFill = reverseActive ? RED : noFill;
-    const Color leftFill = leftActive ? SKYBLUE : noFill;
-    const Color rightFill = rightActive ? YELLOW : noFill;
+    const Color forwardColor = GREEN;
+    const Color reverseColor = RED;
+    const Color leftColor = SKYBLUE;
+    const Color rightColor = YELLOW;
+    const Color forwardFill = forwardActive ? ColorAlpha(forwardColor, 0.95f) : ColorAlpha(forwardColor, 0.18f);
+    const Color reverseFill = reverseActive ? ColorAlpha(reverseColor, 0.95f) : ColorAlpha(reverseColor, 0.18f);
+    const Color leftFill = leftActive ? ColorAlpha(leftColor, 0.95f) : ColorAlpha(leftColor, 0.18f);
+    const Color rightFill = rightActive ? ColorAlpha(rightColor, 0.95f) : ColorAlpha(rightColor, 0.18f);
 
     Vector2 upA = {(float)cx, (float)cy - s * 1.6f};
     Vector2 upB = {(float)cx - s, (float)cy - s * 0.2f};
@@ -106,10 +109,10 @@ static void DrawControlTriangles(int cx, int cy, float s, float accelerationInpu
         DrawLineEx(c, a, 2.0f, outline);
     };
 
-    if (forwardFill.a > 0) DrawTriangle(upA, upB, upC, forwardFill);
-    if (reverseFill.a > 0) DrawTriangle(dnA, dnB, dnC, reverseFill);
-    if (leftFill.a > 0) DrawTriangle(ltA, ltB, ltC, leftFill);
-    if (rightFill.a > 0) DrawTriangle(rtA, rtB, rtC, rightFill);
+    DrawTriangle(upA, upB, upC, forwardFill);
+    DrawTriangle(dnA, dnB, dnC, reverseFill);
+    DrawTriangle(ltA, ltB, ltC, leftFill);
+    DrawTriangle(rtA, rtB, rtC, rightFill);
 
     draw_outline(upA, upB, upC);
     draw_outline(dnA, dnB, dnC);
