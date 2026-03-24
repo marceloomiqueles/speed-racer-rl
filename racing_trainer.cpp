@@ -1708,6 +1708,7 @@ float epsilon = EPSILON_START;
                         << " (" << std::fixed << std::setprecision(1) << (eval.finish_rate * 100.0) << "%)"
                         << " | avg_laps=" << std::fixed << std::setprecision(2) << eval.avg_laps
                         << " | lap_gt1_rate=" << std::fixed << std::setprecision(1) << (eval.lap_gt1_rate * 100.0) << "%"
+                        << " | avg_steps_all=" << std::fixed << std::setprecision(1) << eval.avg_steps_all
                         << " | avg_steps_finish=" << std::fixed << std::setprecision(1) << eval.avg_steps_finish
                         << " | avg_wall_hits=" << std::fixed << std::setprecision(2) << eval.avg_wall_hits
                         << " | avg_grass_frames=" << std::fixed << std::setprecision(1) << eval.avg_grass_frames
@@ -1789,8 +1790,10 @@ float epsilon = EPSILON_START;
                     // Stage 1 goal: drive safely first (low collisions), then move to clean stage.
                     const double DRIVE_MAX_AVG_WALL_HITS = 0.80;
                     const double DRIVE_MIN_LAP_GT1_RATE = 0.20;
+                    const double DRIVE_MAX_AVG_STEPS_ALL = 2600.0;
                     if (eval.avg_wall_hits <= DRIVE_MAX_AVG_WALL_HITS &&
-                        eval.lap_gt1_rate >= DRIVE_MIN_LAP_GT1_RATE) {
+                        eval.lap_gt1_rate >= DRIVE_MIN_LAP_GT1_RATE &&
+                        eval.avg_steps_all <= DRIVE_MAX_AVG_STEPS_ALL) {
                         curriculumStableEvals++;
                     } else {
                         curriculumStableEvals = 0;

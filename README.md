@@ -174,7 +174,7 @@ To enable automatic curriculum stages:
 ```
 
 Curriculum stages (`auto`) advance on milestone evaluations:
-- `drive` -> `clean` when wall hits stay low and `lap_gt1_rate` is healthy (`avg_wall_hits <= 0.80` and `lap_gt1_rate >= 20%`)
+- `drive` -> `clean` when driving is safe and race-oriented (`avg_wall_hits <= 0.80`, `lap_gt1_rate >= 20%`, and `avg_steps_all <= 2600`)
 - `clean` -> `pace` when finish rate and wall-hit stability are good
 - `pace` -> `corner` when finish pace improves consistently
 
