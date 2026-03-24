@@ -847,16 +847,16 @@ int main(int argc, char* argv[]) {
             case CurriculumStage::Drive:
                 // Base stage (exploration): tolerate some wall contacts, prioritize progress.
                 // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.12f, 0.0040f, 4.0f, 1.0f, 0.006f, 120.0f, 600.0f, 180.0f, 2200.0f, 0.0f, 0.0f, 0.0f, 1200.0f, 400.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.11f, 0.0045f, 6.0f, 1.2f, 0.0060f, 110.0f, 550.0f, 180.0f, 2000.0f, 0.0f, 0.0f, 0.0f, 1150.0f, 380.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, stricter collision tolerance.
-                return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0070f, 22.0f, 2.8f, 0.006f, 80.0f, 300.0f, 200.0f, 1000.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
+                return {"drive_strict", 8.0e-4f, 0.35f, 0.020f, 0.999f, 0.11f, 0.0055f, 10.0f, 1.6f, 0.0065f, 100.0f, 520.0f, 200.0f, 1900.0f, 0.0f, 0.0f, 0.0f, 1100.0f, 360.0f};
             case CurriculumStage::Clean:
-                return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0075f, 14.0f, 2.5f, 0.006f, 80.0f, 360.0f, 220.0f, 1200.0f, 0.0f, 0.0f, 0.0f, 900.0f, 300.0f};
+                return {"clean", 6.0e-4f, 0.35f, 0.020f, 0.997f, 0.11f, 0.0065f, 12.0f, 2.0f, 0.0075f, 90.0f, 500.0f, 220.0f, 1800.0f, 0.0f, 0.0f, 0.0f, 1050.0f, 340.0f};
             case CurriculumStage::Pace:
-                return {"pace", 3.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0085f, 16.0f, 3.0f, 0.010f, 55.0f, 420.0f, 180.0f, 1500.0f, 0.0f, 0.0015f, 0.20f, 1000.0f, 350.0f};
+                return {"pace", 4.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0075f, 14.0f, 2.4f, 0.0090f, 80.0f, 480.0f, 220.0f, 1750.0f, 0.0f, 0.0015f, 0.20f, 1000.0f, 330.0f};
             case CurriculumStage::Corner:
-                return {"corner", 1.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0095f, 16.0f, 3.0f, 0.012f, 55.0f, 450.0f, 160.0f, 1700.0f, 0.004f, 0.0020f, 0.25f, 1000.0f, 350.0f};
+                return {"corner", 2.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0085f, 16.0f, 2.8f, 0.0105f, 75.0f, 470.0f, 210.0f, 1700.0f, 0.004f, 0.0020f, 0.25f, 1000.0f, 320.0f};
         }
         return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f, 800.0f, 250.0f};
     };
