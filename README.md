@@ -208,6 +208,7 @@ Recommended safe start values:
 ```
 
 Top-speed reward is only applied when there is forward checkpoint progress and no wall hit on that step.
+Wall-hit penalty also scales with epsilon: base when `epsilon > 0.20`, stronger when `0.08 < epsilon <= 0.20`, and strict when `epsilon <= 0.08`.
 With `--curriculum auto`, top-speed reward is activated automatically in later stages
 (`pace` and `corner`) and stays off in early stability stages (`drive`, `clean`).
 

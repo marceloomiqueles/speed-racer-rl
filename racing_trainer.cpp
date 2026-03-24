@@ -847,16 +847,16 @@ int main(int argc, char* argv[]) {
             case CurriculumStage::Drive:
                 // Base stage (exploration): tolerate some wall contacts, prioritize progress.
                 // Priority order (drive): finish > lap > checkpoints > pace > speed > collision avoidance.
-                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.11f, 0.0045f, 6.0f, 1.2f, 0.0060f, 110.0f, 550.0f, 180.0f, 2000.0f, 0.0f, 0.0f, 0.0f, 1150.0f, 380.0f};
+                return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.996f, 0.12f, 0.0045f, 8.0f, 1.4f, 0.0070f, 130.0f, 700.0f, 220.0f, 2400.0f, 0.0f, 0.0f, 0.0f, 900.0f, 500.0f};
             case CurriculumStage::DriveStrict:
                 // Pre-clean stage: race-drive discipline, stricter collision tolerance.
-                return {"drive_strict", 8.0e-4f, 0.35f, 0.020f, 0.999f, 0.11f, 0.0050f, 9.0f, 1.4f, 0.0065f, 95.0f, 500.0f, 190.0f, 1850.0f, 0.0f, 0.0f, 0.0f, 1100.0f, 340.0f};
+                return {"drive_strict", 8.0e-4f, 0.35f, 0.020f, 0.999f, 0.12f, 0.0052f, 10.0f, 1.6f, 0.0075f, 120.0f, 650.0f, 210.0f, 2300.0f, 0.0f, 0.0f, 0.0f, 850.0f, 480.0f};
             case CurriculumStage::Clean:
-                return {"clean", 6.0e-4f, 0.35f, 0.020f, 0.997f, 0.11f, 0.0060f, 11.0f, 1.8f, 0.0072f, 85.0f, 480.0f, 210.0f, 1750.0f, 0.0f, 0.0f, 0.0f, 1030.0f, 320.0f};
+                return {"clean", 6.0e-4f, 0.35f, 0.020f, 0.997f, 0.12f, 0.0062f, 12.0f, 2.0f, 0.0080f, 110.0f, 620.0f, 230.0f, 2200.0f, 0.0f, 0.0f, 0.0f, 800.0f, 460.0f};
             case CurriculumStage::Pace:
-                return {"pace", 4.0e-4f, 0.20f, 0.010f, 0.998f, 0.12f, 0.0070f, 13.0f, 2.2f, 0.0088f, 75.0f, 460.0f, 210.0f, 1700.0f, 0.0f, 0.0015f, 0.20f, 1000.0f, 310.0f};
+                return {"pace", 4.0e-4f, 0.20f, 0.010f, 0.998f, 0.13f, 0.0072f, 14.0f, 2.4f, 0.0090f, 100.0f, 600.0f, 220.0f, 2100.0f, 0.0f, 0.0015f, 0.20f, 760.0f, 430.0f};
             case CurriculumStage::Corner:
-                return {"corner", 2.0e-4f, 0.10f, 0.005f, 0.999f, 0.13f, 0.0080f, 14.0f, 2.5f, 0.0100f, 70.0f, 450.0f, 200.0f, 1650.0f, 0.004f, 0.0020f, 0.25f, 1000.0f, 300.0f};
+                return {"corner", 2.0e-4f, 0.10f, 0.005f, 0.999f, 0.14f, 0.0085f, 16.0f, 2.8f, 0.0100f, 90.0f, 580.0f, 210.0f, 2000.0f, 0.004f, 0.0020f, 0.25f, 720.0f, 400.0f};
         }
         return {"drive", LEARNING_RATE, EPSILON_START, EPSILON_END, EPSILON_DECAY, 0.10f, 0.0075f, 10.0f, 2.0f, 0.005f, 50.0f, 200.0f, 150.0f, 500.0f, 0.0f, 0.0f, 0.0f, 800.0f, 250.0f};
     };
@@ -1227,7 +1227,7 @@ float epsilon = EPSILON_START;
             }
             return 1;
         }();
-        const float WALL_HIT_TERMINAL_MULTIPLIER = 4.0f;
+        const float WALL_HIT_TERMINAL_MULTIPLIER = 5.0f;
 
         int idleCounter = 0;
         const float V_IDLE = 8.0f;
@@ -1439,14 +1439,21 @@ float epsilon = EPSILON_START;
             }
 
             if (hitWall) {
-                reward -= stageParams.wall_hit_penalty;
+                float wallPenaltyScale = 1.0f;
+                if (epsilon <= 0.08f) {
+                    wallPenaltyScale = 1.6f;  // strict consolidation
+                } else if (epsilon <= 0.20f) {
+                    wallPenaltyScale = 1.3f;  // transition phase
+                }
+                const float effectiveWallPenalty = stageParams.wall_hit_penalty * wallPenaltyScale;
+                reward -= effectiveWallPenalty;
                 // Progressive penalty in drive to discourage repeated wall contacts while
                 // still allowing exploration without immediate DNF.
                 if (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) {
-                    reward -= stageParams.wall_hit_penalty * 0.25f * (float)wallHitsThisEpisode;
+                    reward -= effectiveWallPenalty * 0.25f * (float)wallHitsThisEpisode;
                 }
                 if (terminalWallHit) {
-                    reward -= stageParams.wall_hit_penalty * WALL_HIT_TERMINAL_MULTIPLIER;
+                    reward -= effectiveWallPenalty * WALL_HIT_TERMINAL_MULTIPLIER;
                 }
             }
             if (surfaceFriction > 2.0f) reward -= stageParams.grass_penalty_rate * DT;
