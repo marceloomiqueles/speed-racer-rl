@@ -1207,8 +1207,9 @@ float epsilon = EPSILON_START;
         Vector2 lastCheckPosition = position;
         int consecutiveWallHits = 0;
         int wallHitsThisLap = 0;
-        int wallStuckRecoveries = 0;
-        const bool TERMINATE_ON_WALL_HIT = true;
+        int wallHitsThisEpisode = 0;
+        const int MAX_WALL_HITS_BEFORE_DNF =
+            (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 2 : 1;
         const float WALL_HIT_TERMINAL_MULTIPLIER = 4.0f;
 
         int idleCounter = 0;
@@ -1238,7 +1239,6 @@ float epsilon = EPSILON_START;
         }
 
         while (!raceFinished && episode_steps < max_steps && !interrupted) {
-            bool recoveredFromWallStuck = false;
             bool terminalWallHit = false;
             if (ENABLE_RENDER && WindowShouldClose()) {
                 interrupted = 1;
@@ -1354,14 +1354,15 @@ float epsilon = EPSILON_START;
             if (hitWall) {
                 consecutiveWallHits++;
                 wallHitsThisLap++;
-                if (TERMINATE_ON_WALL_HIT) {
+                wallHitsThisEpisode++;
+                if (wallHitsThisEpisode >= MAX_WALL_HITS_BEFORE_DNF) {
                     terminalWallHit = true;
                 }
             } else {
                 consecutiveWallHits = 0;
             }
 
-            if (!TERMINATE_ON_WALL_HIT && consecutiveWallHits >= 3) {
+            if (!terminalWallHit && consecutiveWallHits >= 3) {
                 Checkpoint& cpTarget = checkpoints[nextCheckpoint];
                 Vector2 cpMid = {
                     (cpTarget.start.x + cpTarget.end.x) * 0.5f,
@@ -1377,8 +1378,6 @@ float epsilon = EPSILON_START;
                     position.y += toCp.y * 3.0f;
                     speed = 20.0f;
                 }
-                wallStuckRecoveries++;
-                recoveredFromWallStuck = true;
                 consecutiveWallHits = 0;
             }
 
@@ -1396,13 +1395,6 @@ float epsilon = EPSILON_START;
             }
 
             float reward = 0.0f;
-            if (recoveredFromWallStuck) {
-                // Strong negative signal when the agent gets glued to walls.
-                reward -= stageParams.wall_hit_penalty * 2.0f;
-                if (wallStuckRecoveries >= 3) {
-                    reward -= STUCK_BREAK_PENALTY;
-                }
-            }
 
             float distToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, position);
             float prevDistToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, prevPosition);
@@ -1431,7 +1423,7 @@ float epsilon = EPSILON_START;
 
             if (hitWall) {
                 reward -= stageParams.wall_hit_penalty;
-                if (TERMINATE_ON_WALL_HIT) {
+                if (terminalWallHit) {
                     reward -= stageParams.wall_hit_penalty * WALL_HIT_TERMINAL_MULTIPLIER;
                 }
             }

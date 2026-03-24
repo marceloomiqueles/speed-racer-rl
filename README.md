@@ -178,6 +178,12 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `clean` -> `pace` when consistency and pace are both good (`finish_rate >= 70%`, `avg_wall_hits <= 0.50`, and `avg_steps_all <= 2400`)
 - `pace` -> `corner` when finish pace improves consistently
 
+Wall-hit DNF policy (training):
+- `drive`: DNF after `2` wall hits (slightly more exploration tolerance)
+- `clean`, `pace`, `corner`: DNF on first wall hit
+
+Greedy milestone evaluation remains strict: DNF on first wall hit.
+
 Optional top-speed reward (off by default):
 
 ```bash
