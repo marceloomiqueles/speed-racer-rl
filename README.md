@@ -181,12 +181,13 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 Reward shaping prioritizes completing the full 3-lap race: `finish_reward` and `lap_reward` are weighted above speed-only incentives.
 
 Wall-hit DNF policy (training):
-- `drive`: no DNF by wall hit (exploration stage)
+- `drive`: DNF after `30` wall hits (exploration stage)
 - `drive_strict`: DNF after `3` wall hits
 - `clean`, `pace`, `corner`: DNF on first wall hit
 
 Greedy milestone evaluation wall-hit policy:
-- `drive`: DNF after `3` wall hits (more informative collision metrics in exploration stage)
+- `drive`: DNF after `30` wall hits
+- `drive_strict`: DNF after `3` wall hits
 - `drive_strict`, `clean`, `pace`, `corner`: DNF on first wall hit
 
 Optional top-speed reward (off by default):
