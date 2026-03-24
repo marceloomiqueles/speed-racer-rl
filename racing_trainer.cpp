@@ -1705,7 +1705,8 @@ float epsilon = EPSILON_START;
             int endEp = episode;
 
             for (int ep = startEp; ep <= endEp; ep++) {
-                int idx = ep - 1;
+                // stats vectors are local to the current process run and start at startEpisode.
+                int idx = ep - startEpisode;
                 if (idx < 0 || idx >= (int)stats.episode_rewards.size()) continue;
 
                 stats_file << ep << ","
