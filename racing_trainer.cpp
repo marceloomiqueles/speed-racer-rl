@@ -2070,12 +2070,14 @@ float epsilon = EPSILON_START;
                     const double DRIVE_STRICT_MAX_AVG_STEPS_ALL = 2300.0;
                     const double DRIVE_STRICT_MIN_AVG_LAPS = 2.70;
                     const double DRIVE_STRICT_MIN_LAP_GT1_RATE = 0.90;
+                    const double DRIVE_STRICT_MIN_AVG_LAPS_FOR_PROMOTION = 2.90;
                     const int DRIVE_STRICT_REQUIRED_STABLE_EVALS = 2;
                     if (eval.finish_rate >= DRIVE_STRICT_MIN_FINISH_RATE &&
                         eval.avg_wall_hits <= DRIVE_STRICT_MAX_AVG_WALL_HITS &&
                         eval.avg_steps_all <= DRIVE_STRICT_MAX_AVG_STEPS_ALL &&
                         eval.avg_laps >= DRIVE_STRICT_MIN_AVG_LAPS &&
-                        eval.lap_gt1_rate >= DRIVE_STRICT_MIN_LAP_GT1_RATE) {
+                        eval.lap_gt1_rate >= DRIVE_STRICT_MIN_LAP_GT1_RATE &&
+                        eval.avg_laps >= DRIVE_STRICT_MIN_AVG_LAPS_FOR_PROMOTION) {
                         curriculumStableEvals++;
                     } else {
                         curriculumStableEvals = 0;
@@ -2089,9 +2091,11 @@ float epsilon = EPSILON_START;
                     const double CLEAN_MIN_FINISH_RATE = 0.90;
                     const double CLEAN_MAX_AVG_WALL_HITS = 0.10;
                     const double CLEAN_MAX_AVG_STEPS_ALL = 2400.0;
+                    const double CLEAN_MIN_AVG_LAPS_FOR_PROMOTION = 2.95;
                     if (eval.finish_rate >= CLEAN_MIN_FINISH_RATE &&
                         eval.avg_wall_hits <= CLEAN_MAX_AVG_WALL_HITS &&
-                        eval.avg_steps_all <= CLEAN_MAX_AVG_STEPS_ALL) {
+                        eval.avg_steps_all <= CLEAN_MAX_AVG_STEPS_ALL &&
+                        eval.avg_laps >= CLEAN_MIN_AVG_LAPS_FOR_PROMOTION) {
                         curriculumStableEvals++;
                     } else {
                         curriculumStableEvals = 0;
@@ -2107,6 +2111,7 @@ float epsilon = EPSILON_START;
                             curriculumStageEntryBestSteps = eval.avg_steps_finish;
                         }
                         if (eval.finish_rate >= 0.70 &&
+                            eval.avg_laps >= 2.95 &&
                             eval.avg_steps_finish <= curriculumStageEntryBestSteps * 0.97) {
                             curriculumStableEvals++;
                         } else {
