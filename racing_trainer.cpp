@@ -401,6 +401,8 @@ static EvalResult EvaluateGreedy(
     const float FRICTION = 50.0f;
     const float TURN_SPEED_BASE = 3.0f;
     const float TURN_SPEED_FACTOR = 0.3f;
+    const bool TERMINATE_ON_WALL_HIT = true;
+    const double WALL_HIT_TERMINAL_SCORE_PENALTY = 5000.0;
 
 // Scoring weights (tune later if you want).
     const float FINISH_BONUS = 100000.0f;
@@ -442,6 +444,7 @@ static EvalResult EvaluateGreedy(
 
         int wallHits = 0;
         int grassFrames = 0;
+        bool terminalWallHitEpisode = false;
 
         std::vector<float> state = GetState(trackImage, position, angle, speed);
 
@@ -533,11 +536,14 @@ static EvalResult EvaluateGreedy(
 
             if (hitWall) {
                 consecutiveWallHits++;
+                if (TERMINATE_ON_WALL_HIT) {
+                    terminalWallHitEpisode = true;
+                }
             } else {
                 consecutiveWallHits = 0;
             }
 
-            if (consecutiveWallHits >= 3) {
+            if (!TERMINATE_ON_WALL_HIT && consecutiveWallHits >= 3) {
                 Checkpoint& cpTarget = checkpoints[nextCheckpoint];
                 Vector2 cpMid = {
                     (cpTarget.start.x + cpTarget.end.x) * 0.5f,
@@ -591,6 +597,7 @@ static EvalResult EvaluateGreedy(
             }
 
             steps++;
+            if (terminalWallHitEpisode) break;
             state = GetState(trackImage, position, angle, speed);
         }
 
@@ -599,6 +606,9 @@ static EvalResult EvaluateGreedy(
         score -= (double)steps * STEP_PENALTY;
         score -= (double)wallHits * WALL_HIT_PENALTY;
         score -= (double)grassFrames * GRASS_PENALTY;
+        if (terminalWallHitEpisode) {
+            score -= WALL_HIT_TERMINAL_SCORE_PENALTY;
+        }
 
         sumScore += score;
         sumLaps += currentLap;
@@ -1197,6 +1207,9 @@ float epsilon = EPSILON_START;
         Vector2 lastCheckPosition = position;
         int consecutiveWallHits = 0;
         int wallHitsThisLap = 0;
+        int wallStuckRecoveries = 0;
+        const bool TERMINATE_ON_WALL_HIT = true;
+        const float WALL_HIT_TERMINAL_MULTIPLIER = 4.0f;
 
         int idleCounter = 0;
         const float V_IDLE = 8.0f;
@@ -1225,6 +1238,8 @@ float epsilon = EPSILON_START;
         }
 
         while (!raceFinished && episode_steps < max_steps && !interrupted) {
+            bool recoveredFromWallStuck = false;
+            bool terminalWallHit = false;
             if (ENABLE_RENDER && WindowShouldClose()) {
                 interrupted = 1;
                 break;
@@ -1339,11 +1354,14 @@ float epsilon = EPSILON_START;
             if (hitWall) {
                 consecutiveWallHits++;
                 wallHitsThisLap++;
+                if (TERMINATE_ON_WALL_HIT) {
+                    terminalWallHit = true;
+                }
             } else {
                 consecutiveWallHits = 0;
             }
 
-            if (consecutiveWallHits >= 3) {
+            if (!TERMINATE_ON_WALL_HIT && consecutiveWallHits >= 3) {
                 Checkpoint& cpTarget = checkpoints[nextCheckpoint];
                 Vector2 cpMid = {
                     (cpTarget.start.x + cpTarget.end.x) * 0.5f,
@@ -1359,6 +1377,8 @@ float epsilon = EPSILON_START;
                     position.y += toCp.y * 3.0f;
                     speed = 20.0f;
                 }
+                wallStuckRecoveries++;
+                recoveredFromWallStuck = true;
                 consecutiveWallHits = 0;
             }
 
@@ -1376,6 +1396,13 @@ float epsilon = EPSILON_START;
             }
 
             float reward = 0.0f;
+            if (recoveredFromWallStuck) {
+                // Strong negative signal when the agent gets glued to walls.
+                reward -= stageParams.wall_hit_penalty * 2.0f;
+                if (wallStuckRecoveries >= 3) {
+                    reward -= STUCK_BREAK_PENALTY;
+                }
+            }
 
             float distToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, position);
             float prevDistToNextCP = DistToCheckpointMid(checkpoints, nextCheckpoint, prevPosition);
@@ -1402,7 +1429,12 @@ float epsilon = EPSILON_START;
                 episodeTopSpeed = fabs(speed);
             }
 
-            if (hitWall) reward -= stageParams.wall_hit_penalty;
+            if (hitWall) {
+                reward -= stageParams.wall_hit_penalty;
+                if (TERMINATE_ON_WALL_HIT) {
+                    reward -= stageParams.wall_hit_penalty * WALL_HIT_TERMINAL_MULTIPLIER;
+                }
+            }
             if (surfaceFriction > 2.0f) reward -= stageParams.grass_penalty_rate * DT;
 
             reward -= stageParams.step_penalty;
@@ -1504,7 +1536,7 @@ float epsilon = EPSILON_START;
             episode_steps++;
 
             std::vector<float> next_state = GetState(trackImage, position, angle, speed);
-            bool done = raceFinished || episode_steps >= max_steps;
+            bool done = raceFinished || episode_steps >= max_steps || terminalWallHit;
 
             replay_buffer.add(state, action, reward, next_state, done);
 
