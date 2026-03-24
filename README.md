@@ -181,7 +181,7 @@ To enable automatic curriculum stages:
 
 Curriculum stages (`auto`) advance on milestone evaluations:
 - `drive` -> `drive_strict` when driving is safe and race-oriented (`avg_wall_hits <= 0.70`, `lap_gt1_rate >= 20%`, and `avg_steps_all <= 2600`) for `4` consecutive evals
-- `drive_strict` -> `clean` when it starts finishing races with strict wall discipline (`finish_rate >= 65%`, `avg_wall_hits <= 0.15`, and `avg_steps_all <= 2300`) for `2` consecutive evals
+- `drive_strict` -> `clean` when it starts finishing races with strict wall discipline (`finish_rate >= 65%`, `avg_wall_hits <= 0.15`, `avg_steps_all <= 2300`, `avg_laps >= 2.70`, and `lap_gt1_rate >= 90%`) for `2` consecutive evals
 - `clean` -> `pace` when consistency is championship-level (`finish_rate >= 90%`, `avg_wall_hits <= 0.10`, and `avg_steps_all <= 2400`) for `2` consecutive evals
 - `pace` -> `corner` when finish pace improves consistently (>= 3% vs pace-entry baseline, with `finish_rate >= 70%`)
 Each milestone now runs two evaluations with spawn jitter (position/angle): `greedy` (`eps=0.00`) and `semi-greedy` (`eps=0.02`), using `30` eval episodes per mode.

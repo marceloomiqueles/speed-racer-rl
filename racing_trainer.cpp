@@ -2063,10 +2063,14 @@ float epsilon = EPSILON_START;
                     const double DRIVE_STRICT_MIN_FINISH_RATE = 0.65;
                     const double DRIVE_STRICT_MAX_AVG_WALL_HITS = 0.15;
                     const double DRIVE_STRICT_MAX_AVG_STEPS_ALL = 2300.0;
+                    const double DRIVE_STRICT_MIN_AVG_LAPS = 2.70;
+                    const double DRIVE_STRICT_MIN_LAP_GT1_RATE = 0.90;
                     const int DRIVE_STRICT_REQUIRED_STABLE_EVALS = 2;
                     if (eval.finish_rate >= DRIVE_STRICT_MIN_FINISH_RATE &&
                         eval.avg_wall_hits <= DRIVE_STRICT_MAX_AVG_WALL_HITS &&
-                        eval.avg_steps_all <= DRIVE_STRICT_MAX_AVG_STEPS_ALL) {
+                        eval.avg_steps_all <= DRIVE_STRICT_MAX_AVG_STEPS_ALL &&
+                        eval.avg_laps >= DRIVE_STRICT_MIN_AVG_LAPS &&
+                        eval.lap_gt1_rate >= DRIVE_STRICT_MIN_LAP_GT1_RATE) {
                         curriculumStableEvals++;
                     } else {
                         curriculumStableEvals = 0;
