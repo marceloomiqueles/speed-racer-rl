@@ -178,6 +178,7 @@ Curriculum stages (`auto`) advance on milestone evaluations:
 - `drive_strict` -> `clean` when it starts finishing with strict wall discipline (`finish_rate >= 20%`, `avg_wall_hits <= 0.15`, and `avg_steps_all <= 2300`) for `2` consecutive evals
 - `clean` -> `pace` when consistency and pace are both good (`finish_rate >= 70%`, `avg_wall_hits <= 0.50`, and `avg_steps_all <= 2400`)
 - `pace` -> `corner` when finish pace improves consistently
+Reward shaping prioritizes completing the full 3-lap race: `finish_reward` and `lap_reward` are weighted above speed-only incentives.
 
 Wall-hit DNF policy (training):
 - `drive`: no DNF by wall hit (exploration stage)
