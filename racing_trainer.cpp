@@ -658,7 +658,8 @@ int main(int argc, char* argv[]) {
         Drive = 1,
         Clean = 2,
         Pace = 3,
-        Corner = 4
+        Corner = 4,
+        DriveStrict = 5
     };
 
     int MILESTONE_FREQUENCY = 50;
@@ -842,8 +843,11 @@ int main(int argc, char* argv[]) {
     auto get_stage_params = [&](CurriculumStage stage) -> StageParams {
         switch (stage) {
             case CurriculumStage::Drive:
-                // Base stage: prioritize stability/no-collision before speed.
+                // Base stage (exploration): tolerate some wall contacts, prioritize progress.
                 return {"drive", 1.0e-3f, 1.00f, 0.030f, 0.998f, 0.08f, 0.0065f, 20.0f, 3.0f, 0.005f, 40.0f, 180.0f, 120.0f, 450.0f, 0.0f, 0.0f, 0.0f};
+            case CurriculumStage::DriveStrict:
+                // Pre-clean stage: race-drive discipline, DNF on first wall hit.
+                return {"drive_strict", 7.0e-4f, 0.35f, 0.020f, 0.999f, 0.10f, 0.0075f, 22.0f, 2.8f, 0.006f, 50.0f, 240.0f, 200.0f, 520.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Clean:
                 return {"clean", 5.0e-4f, 0.35f, 0.020f, 0.997f, 0.10f, 0.0085f, 14.0f, 2.5f, 0.006f, 62.0f, 300.0f, 220.0f, 550.0f, 0.0f, 0.0f, 0.0f};
             case CurriculumStage::Pace:
@@ -1138,7 +1142,7 @@ float epsilon = EPSILON_START;
             if (state.count("learning_rate")) dqn.set_learning_rate(std::stof(state["learning_rate"]));
             if (curriculumMode == CurriculumMode::Auto && state.count("curriculum_stage")) {
                 int st = std::stoi(state["curriculum_stage"]);
-                if (st >= (int)CurriculumStage::Drive && st <= (int)CurriculumStage::Corner) {
+                if (st >= (int)CurriculumStage::Drive && st <= (int)CurriculumStage::DriveStrict) {
                     curriculumStage = (CurriculumStage)st;
                 }
             }
@@ -1210,7 +1214,7 @@ float epsilon = EPSILON_START;
         int wallHitsThisLap = 0;
         int wallHitsThisEpisode = 0;
         const int MAX_WALL_HITS_BEFORE_DNF =
-            (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 6 : 1;
+            (curriculumMode == CurriculumMode::Auto && curriculumStage == CurriculumStage::Drive) ? 3 : 1;
         const float WALL_HIT_TERMINAL_MULTIPLIER = 4.0f;
 
         int idleCounter = 0;
@@ -1843,7 +1847,7 @@ float epsilon = EPSILON_START;
                 CurriculumStage nextStage = curriculumStage;
 
                 if (curriculumStage == CurriculumStage::Drive) {
-                    // Stage 1 goal: drive safely first (low collisions), then move to clean stage.
+                    // Stage 1 goal: exploration drive with progress and controlled collisions.
                     const double DRIVE_MAX_AVG_WALL_HITS = 0.80;
                     const double DRIVE_MIN_LAP_GT1_RATE = 0.20;
                     const double DRIVE_MAX_AVG_STEPS_ALL = 2600.0;
@@ -1856,6 +1860,23 @@ float epsilon = EPSILON_START;
                         curriculumStableEvals = 0;
                     }
                     if (curriculumStableEvals >= DRIVE_REQUIRED_STABLE_EVALS) {
+                        promote = true;
+                        nextStage = CurriculumStage::DriveStrict;
+                    }
+                } else if (curriculumStage == CurriculumStage::DriveStrict) {
+                    // Stage 1b goal: strict race-drive behavior before clean stage.
+                    const double DRIVE_STRICT_MIN_FINISH_RATE = 0.20;
+                    const double DRIVE_STRICT_MAX_AVG_WALL_HITS = 0.15;
+                    const double DRIVE_STRICT_MAX_AVG_STEPS_ALL = 2300.0;
+                    const int DRIVE_STRICT_REQUIRED_STABLE_EVALS = 2;
+                    if (eval.finish_rate >= DRIVE_STRICT_MIN_FINISH_RATE &&
+                        eval.avg_wall_hits <= DRIVE_STRICT_MAX_AVG_WALL_HITS &&
+                        eval.avg_steps_all <= DRIVE_STRICT_MAX_AVG_STEPS_ALL) {
+                        curriculumStableEvals++;
+                    } else {
+                        curriculumStableEvals = 0;
+                    }
+                    if (curriculumStableEvals >= DRIVE_STRICT_REQUIRED_STABLE_EVALS) {
                         promote = true;
                         nextStage = CurriculumStage::Clean;
                     }
