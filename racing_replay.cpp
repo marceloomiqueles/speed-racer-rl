@@ -274,6 +274,9 @@ std::vector<float> GetState(const Image& trackImage, Vector2 position, float ang
 int main(int argc, char* argv[]) {
     std::string modelPath;
     std::string trackName = "sandbox";
+    int dnfWallHits = 3;
+    int maxEpisodeSteps = 7500;
+    int maxStepsWithoutCheckpoint = 1100;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -283,9 +286,46 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             trackName = argv[++i];
+        } else if (arg == "--dnf-wall-hits") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --dnf-wall-hits\n";
+                return 1;
+            }
+            try {
+                dnfWallHits = std::stoi(argv[++i]);
+                if (dnfWallHits <= 0) throw std::invalid_argument("non-positive");
+            } catch (...) {
+                std::cerr << "Invalid value for --dnf-wall-hits (expected positive integer)\n";
+                return 1;
+            }
+        } else if (arg == "--max-steps") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --max-steps\n";
+                return 1;
+            }
+            try {
+                maxEpisodeSteps = std::stoi(argv[++i]);
+                if (maxEpisodeSteps <= 0) throw std::invalid_argument("non-positive");
+            } catch (...) {
+                std::cerr << "Invalid value for --max-steps (expected positive integer)\n";
+                return 1;
+            }
+        } else if (arg == "--max-steps-without-checkpoint") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --max-steps-without-checkpoint\n";
+                return 1;
+            }
+            try {
+                maxStepsWithoutCheckpoint = std::stoi(argv[++i]);
+                if (maxStepsWithoutCheckpoint <= 0) throw std::invalid_argument("non-positive");
+            } catch (...) {
+                std::cerr << "Invalid value for --max-steps-without-checkpoint (expected positive integer)\n";
+                return 1;
+            }
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: racing_replay [model_path] [--track <track_name>]\n";
+            std::cout << "Usage: racing_replay [model_path] [--track <track_name>] [--dnf-wall-hits <n>] [--max-steps <n>] [--max-steps-without-checkpoint <n>]\n";
             std::cout << "Example: racing_replay models/model_episode_450.pt --track sandbox\n";
+            std::cout << "Example: racing_replay --track sandbox --dnf-wall-hits 2 --max-steps 6000 --max-steps-without-checkpoint 900\n";
             std::cout << "Auto mode: racing_replay --track sandbox\n";
             return 0;
         } else if (!arg.empty() && arg[0] == '-') {
@@ -356,6 +396,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Loading model: " << modelPath << std::endl;
     std::cout << "Track: " << track.name << std::endl;
     std::cout << "Car scale: " << track.car_scale << std::endl;
+    std::cout << "DNF wall hits: " << dnfWallHits << std::endl;
+    std::cout << "Max steps: " << maxEpisodeSteps << std::endl;
+    std::cout << "Max steps without checkpoint: " << maxStepsWithoutCheckpoint << std::endl;
     if (track.is_stub) {
         std::cout << "WARNING: track '" << track.name
                   << "' is a stub and currently uses sandbox geometry.\n";
@@ -419,11 +462,19 @@ int main(int argc, char* argv[]) {
     std::vector<float> lapTimes;
     bool raceStarted = true;
     bool raceFinished = false;
+    bool raceDnf = false;
+    std::string raceEndReason;
     int nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
 
     bool showLidar = true;
     int consecutiveWallHits = 0;
     int wallHitsThisLap = 0;
+    int wallHitsThisEpisode = 0;
+    int episodeSteps = 0;
+    int stepsSinceCheckpoint = 0;
+    const int MAX_WALL_HITS_BEFORE_DNF = dnfWallHits;
+    const int MAX_EPISODE_STEPS = maxEpisodeSteps;
+    const int MAX_STEPS_WITHOUT_CHECKPOINT = maxStepsWithoutCheckpoint;
     std::filesystem::path aiRecordsPath = ResolveAiRecordsPath();
     auto aiRecords = LoadAiLapRecords(aiRecordsPath);
     std::string aiRecordText = "AI Record: N/A";
@@ -436,7 +487,7 @@ int main(int argc, char* argv[]) {
     SetTargetFPS(60);
 
     while (!WindowShouldClose()) {
-        float dt = GetFrameTime();
+        const float dt = 1.0f / 60.0f; // Keep replay simulation aligned with trainer.
         Vector2 prevPosition = position;
 
         if (raceStarted && !raceFinished) currentLapTime += dt;
@@ -450,10 +501,15 @@ int main(int argc, char* argv[]) {
             currentLapTime = 0;
             raceStarted = true;
             raceFinished = false;
+            raceDnf = false;
+            raceEndReason.clear();
             nextCheckpoint = START_LAP_ACTIVE ? 1 : 0;
             lapTimes.clear();
             bestLapTime = 999999.0f;
             wallHitsThisLap = 0;
+            wallHitsThisEpisode = 0;
+            episodeSteps = 0;
+            stepsSinceCheckpoint = 0;
             for (auto& checkpoint : checkpoints) checkpoint.crossed = false;
         }
 
@@ -525,6 +581,8 @@ int main(int argc, char* argv[]) {
 
             position.x += velocity.x * dt;
             position.y += velocity.y * dt;
+            episodeSteps++;
+            stepsSinceCheckpoint++;
         }
 
 // Collision detection
@@ -539,6 +597,7 @@ int main(int argc, char* argv[]) {
                 speed = 0.0f;
                 consecutiveWallHits++;
                 wallHitsThisLap++;
+                wallHitsThisEpisode++;
             } else {
                 consecutiveWallHits = 0;
             }
@@ -547,9 +606,14 @@ int main(int argc, char* argv[]) {
             speed = 0.0f;
             consecutiveWallHits++;
             wallHitsThisLap++;
+            wallHitsThisEpisode++;
         }
 
-        if (consecutiveWallHits >= 3) {
+        if (wallHitsThisEpisode >= MAX_WALL_HITS_BEFORE_DNF) {
+            raceFinished = true;
+            raceDnf = true;
+            raceEndReason = "DNF: too many wall hits";
+        } else if (consecutiveWallHits >= 3) {
             Checkpoint& cpTarget = checkpoints[nextCheckpoint];
             Vector2 cpMid = {
                 (cpTarget.start.x + cpTarget.end.x) * 0.5f,
@@ -608,6 +672,7 @@ int main(int argc, char* argv[]) {
                             currentLap++;
                             currentLapTime = 0.0f;
                             wallHitsThisLap = 0;
+                            stepsSinceCheckpoint = 0;
 
                             for (auto& checkpoint : checkpoints) checkpoint.crossed = false;
                             nextCheckpoint = 1;
@@ -622,16 +687,28 @@ int main(int argc, char* argv[]) {
                         wallHitsThisLap = 0;
                         cp.crossed = false;
                         nextCheckpoint = 1;
+                        stepsSinceCheckpoint = 0;
                     }
                 } else {
                     if (currentLap > 0 && nextCheckpoint != 0) {
                         cp.crossed = true;
                         nextCheckpoint = (nextCheckpoint + 1) % (int)checkpoints.size();
+                        stepsSinceCheckpoint = 0;
                     } else {
                         cp.crossed = false;
                     }
                 }
             }
+        }
+        if (!raceFinished && stepsSinceCheckpoint >= MAX_STEPS_WITHOUT_CHECKPOINT) {
+            raceFinished = true;
+            raceDnf = true;
+            raceEndReason = "DNF: no checkpoint progress";
+        }
+        if (!raceFinished && episodeSteps >= MAX_EPISODE_STEPS) {
+            raceFinished = true;
+            raceDnf = true;
+            raceEndReason = "DNF: episode timeout";
         }
 
         BeginDrawing();
@@ -680,19 +757,26 @@ int main(int argc, char* argv[]) {
             DrawText(TextFormat("Speed: %.0f", fabs(speed)), 10, 30, 20, DARKGRAY);
             DrawText(TextFormat("Lap: %d / %d", currentLap, totalLaps), 10, 50, 20, DARKGRAY);
             DrawText(TextFormat("Time: %.2fs", currentLapTime), 10, 70, 20, DARKGRAY);
+            DrawText(TextFormat("Steps: %d / %d", episodeSteps, MAX_EPISODE_STEPS), 10, 90, 18, DARKGRAY);
+            DrawText(TextFormat("WallHits: %d / %d", wallHitsThisEpisode, MAX_WALL_HITS_BEFORE_DNF), 10, 108, 18, DARKGRAY);
 
             if (bestLapTime < 999999.0f) {
-                DrawText(TextFormat("Best: %.2fs", bestLapTime), 10, 90, 20, GOLD);
+                DrawText(TextFormat("Best: %.2fs", bestLapTime), 10, 128, 20, GOLD);
             }
-            DrawText(aiRecordText.c_str(), 10, 110, 18, DARKGREEN);
+            DrawText(aiRecordText.c_str(), 10, 150, 18, DARKGREEN);
 
             DrawText("SPACE - Restart | L - Toggle LIDAR | ESC - Exit", 10, screenHeight - 30, 16, DARKGRAY);
 
-            if (raceFinished && lapTimes.size() >= 3) {
+            if (raceFinished && lapTimes.size() >= 3 && !raceDnf) {
                 DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.7f));
                 DrawText("RACE FINISHED!", screenWidth/2 - 120, screenHeight/2 - 40, 30, GOLD);
                 DrawText(TextFormat("Total Time: %.2fs", lapTimes[0] + lapTimes[1] + lapTimes[2]),
                          screenWidth/2 - 100, screenHeight/2, 20, WHITE);
+                DrawText("Press SPACE to restart", screenWidth/2 - 100, screenHeight/2 + 40, 20, WHITE);
+            } else if (raceFinished && raceDnf) {
+                DrawRectangle(0, 0, screenWidth, screenHeight, Fade(BLACK, 0.7f));
+                DrawText("DNF", screenWidth/2 - 35, screenHeight/2 - 50, 40, RED);
+                DrawText(raceEndReason.c_str(), screenWidth/2 - 140, screenHeight/2, 22, WHITE);
                 DrawText("Press SPACE to restart", screenWidth/2 - 100, screenHeight/2 + 40, 20, WHITE);
             }
 

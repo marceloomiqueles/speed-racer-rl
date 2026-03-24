@@ -134,6 +134,12 @@ Or use auto mode (loads `models/<track>/best_time.pt` and falls back to `../trai
 ./racing_replay --track sandbox
 ```
 
+Replay runtime DNF/episode limits can be tuned without recompiling:
+
+```bash
+./racing_replay --track sandbox --dnf-wall-hits 2 --max-steps 6000 --max-steps-without-checkpoint 900
+```
+
 Replay runs in real time and renders the environment, vehicle, and perception rays.
 When replay sets a better AI lap time for a track, it updates `tracks_ai_records.csv`
 with the best `time_seconds`, formatted time, model name, UTC timestamp, and
