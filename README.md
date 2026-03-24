@@ -217,7 +217,7 @@ Recommended safe start values:
 ```
 
 Top-speed reward is only applied when there is forward checkpoint progress and no wall hit on that step.
-Wall-hit penalty also scales with epsilon: base when `epsilon > 0.20`, stronger when `0.03 < epsilon <= 0.20`, strict when `0.015 < epsilon <= 0.03`, and very strict when `epsilon <= 0.015`.
+Wall-hit penalty also scales with epsilon: base when `epsilon > 0.20`, stronger when `0.03 < epsilon <= 0.20`, strict when `0.015 < epsilon <= 0.03`, and very strict when `epsilon <= 0.015`. In `drive_strict`, low-epsilon hardening is intentionally softer than `drive`.
 With `--curriculum auto`, top-speed reward is activated automatically in later stages
 (`pace` and `corner`) and stays off in early stability stages (`drive`, `clean`).
 

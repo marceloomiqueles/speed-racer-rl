@@ -1524,7 +1524,12 @@ float epsilon = EPSILON_START;
             if (hitWall) {
                 float wallPenaltyScale = 1.0f;
                 if (epsilon <= 0.015f) {
-                    wallPenaltyScale = 1.9f;  // strict but less destabilizing
+                    if (curriculumMode == CurriculumMode::Auto &&
+                        curriculumStage == CurriculumStage::DriveStrict) {
+                        wallPenaltyScale = 1.4f;  // ~74% of drive hardening (1.9x)
+                    } else {
+                        wallPenaltyScale = 1.9f;  // drive / other stages strict hardening
+                    }
                 } else if (epsilon <= 0.03f) {
                     wallPenaltyScale = 1.7f;  // strict consolidation
                 } else if (epsilon <= 0.20f) {
